@@ -60,14 +60,20 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
 
-# Sprint 0 targets (placeholders - to be implemented)
+# Sprint 0 targets (Phase 2 data pipeline implemented)
 data_us:
-	@echo "TODO: Implement US data ingestion"
-	@echo "Command: uv run --locked python -m src.data.ingest_yf_us --config configs/data_us.yaml"
+	@echo "Running US data pipeline..."
+	uv run --locked python -m src.data.ingest_yf_us --config configs/data_us.yaml
+	uv run --locked python -m src.data.build_universe --config configs/data_us.yaml --output data/universe_us.parquet
+	uv run --locked python -m src.data.build_qlib_dataset --config configs/data_us.yaml
+	@echo "US data pipeline complete"
 
 data_cn:
-	@echo "TODO: Implement CN data ingestion"
-	@echo "Command: uv run --locked python -m src.data.ingest_ak_cn --config configs/data_cn.yaml"
+	@echo "Running CN data pipeline..."
+	uv run --locked python -m src.data.ingest_ts_cn --config configs/data_cn.yaml
+	uv run --locked python -m src.data.build_universe --config configs/data_cn.yaml --output data/universe_cn.parquet
+	uv run --locked python -m src.data.build_qlib_dataset --config configs/data_cn.yaml
+	@echo "CN data pipeline complete"
 
 train_us:
 	@echo "TODO: Implement Model 2 training for US"

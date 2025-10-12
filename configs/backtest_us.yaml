@@ -1,0 +1,51 @@
+# Backtest Configuration - US
+# Sprint 0 - Section 1 specs (frozen)
+# Pyqlib backtest engine with performance metrics
+
+# Core identifiers
+region: US
+random_state: 42
+
+# Backtest period
+start_date: "2020-01-01"
+end_date: "2025-06-30"
+
+# Qlib data provider
+provider_uri: data/qlib/us_data
+
+# Executor configuration
+executor_type: SimulatorExecutor  # Qlib's simulator
+
+# Slippage model (S0: simple fixed bps; S2: realized shortfall)
+slippage_model:
+  type: fixed_bps
+  buy_slippage_bps: 5.0
+  sell_slippage_bps: 5.0
+
+# Trading parameters
+trading:
+  start_time: "09:30:00"  # NYSE market open
+  end_time: "16:00:00"    # NYSE market close
+  trade_unit: stock       # vs dollar
+  limit_threshold: 0.05   # price limit for order execution
+
+# Initial capital
+capital: 10000000.0  # $10M USD
+
+# Report metrics (per Sprint 0 spec acceptance tests)
+report_metrics:
+  - annual_return
+  - annual_volatility
+  - sharpe_ratio
+  - max_drawdown
+  - calmar_ratio
+  - turnover
+  - costs
+  - industry_exposures
+  - holdings
+
+# Output paths
+output:
+  portfolio_path: data/backtest/US/portfolio.pkl
+  metrics_path: data/backtest/US/metrics.json
+  report_html: reports/sprint0_US/report.html

@@ -1,0 +1,61 @@
+# US Data Ingestion Configuration
+# Sprint 0 - Section 1 specs (frozen)
+
+# Core identifiers
+region: US
+random_state: 42
+
+# Data source
+data_source: yfinance
+provider_uri: data/qlib/us_data
+
+# Date range (per specs: example 2003-2025)
+start_date: "2003-01-01"
+end_date: "2025-06-30"
+
+# Universe construction (monthly reconstitution)
+universe_size: 800
+reconstitution_frequency: monthly  # last trading day of month
+
+# Eligibility filters (per docs/theory.md:284-291)
+eligibility:
+  min_price: 3.0          # USD per share
+  min_adv_usd: 5000000.0  # minimum average daily volume in USD (5M per spec)
+  exclude_etfs: true
+  exclude_reits: false    # REITs allowed in US universe
+
+# Industry assignment
+industry_classification: GICS  # or "yfinance_sector"
+industry_mode: frozen_at_first_seen  # US policy per Sprint 0 spec
+
+# Price/volume data
+fields:
+  - open
+  - high
+  - low
+  - close
+  - volume
+  - adj_close
+
+# Adjustment handling (per specs: persist raw + derive explicit factors)
+adjustment_method: explicit_factors
+corporate_actions:
+  - splits
+  - dividends
+
+# Calendar
+calendar: NYSE  # US exchange calendar for trading days
+
+# Performance
+chunk_size: 100  # symbols per batch for yfinance
+max_workers: 8   # parallel download workers
+retry_attempts: 3
+timeout_seconds: 30
+
+# Output format
+output_format: qlib_bin  # Qlib binary format
+compression: lz4
+
+# Logging
+log_level: INFO
+log_progress_every: 50  # symbols

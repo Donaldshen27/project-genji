@@ -1,6 +1,6 @@
 [project]
 name = "quant-system"
-version = "0.1.0"
+version = "0.2.0"
 description = "Industry-aware equity trading system with regime detection and RL-based portfolio optimization"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,7 +20,7 @@ dependencies = [
 
     # Data sources
     "yfinance>=0.2.0",
-    "akshare>=1.13.0",
+    "tushare>=1.4.0",
 
     # Core scientific computing
     # Using flexible numpy constraint compatible with qlib
@@ -38,6 +38,7 @@ dependencies = [
     "tqdm>=4.65.0",
     "joblib>=1.3.0",
     "pyarrow>=14.0.0",  # For Parquet support
+    "pandas-market-calendars>=4.0.0",  # For trading calendar management
 ]
 
 [project.optional-dependencies]

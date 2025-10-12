@@ -1,0 +1,68 @@
+# CN Data Ingestion Configuration
+# Sprint 0 - Section 1 specs (frozen)
+
+# Core identifiers
+region: CN
+random_state: 42
+
+# Data source
+data_source: tushare  # Tushare Pro API for CN A-shares
+provider_uri: data/qlib/cn_data
+
+# Tushare API authentication
+# Set TUSHARE_TOKEN environment variable or provide token here
+# Get your token from: https://tushare.pro/register
+tushare_token: "8a1a42b6abaeb2774f9423eabc5c4f65189cb4478eb04a845b91d734"
+
+# Date range (CN A-shares: 2010-2025 per availability)
+start_date: "2010-01-01"
+end_date: "2025-06-30"
+
+# Universe construction (monthly reconstitution)
+universe_size: 800
+reconstitution_frequency: monthly  # last trading day of month
+
+# Eligibility filters (per docs/theory.md:284-291)
+# Note: CN-specific rules (ST stocks, IPO age) handled in ingestion code per S0 spec
+eligibility:
+  min_price: 3.0          # CNY per share
+  min_adv_usd: 5000000.0  # minimum average daily volume in USD equivalent (5M per spec)
+  exclude_etfs: true
+  exclude_reits: false
+
+# Industry assignment
+industry_classification: SHENWAN_L1  # Shenwan Level 1 industry classification
+industry_mode: frozen_at_first_seen  # S0: frozen; PIT snapshots in S1+
+
+# Price/volume data
+fields:
+  - open
+  - high
+  - low
+  - close
+  - volume
+  - amount  # CNY traded amount (for ADV calculation)
+
+# Adjustment handling (per specs: persist raw + derive explicit factors)
+adjustment_method: explicit_factors
+corporate_actions:
+  - splits
+  - dividends
+  - rights
+
+# Calendar
+calendar: SSE  # Shanghai Stock Exchange calendar for trading days
+
+# Performance
+chunk_size: 100  # symbols per batch
+max_workers: 8   # parallel download workers
+retry_attempts: 3
+timeout_seconds: 30
+
+# Output format
+output_format: qlib_bin  # Qlib binary format
+compression: lz4
+
+# Logging
+log_level: INFO
+log_progress_every: 50  # symbols

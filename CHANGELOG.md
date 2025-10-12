@@ -8,11 +8,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Sprint 0 - Baseline Implementation (In Progress)
-- Data ingestion modules (US/CN)
 - Model 2 (stock alpha forecasting)
 - QP optimizer with risk/cost model
 - Qlib backtest integration
 - HTML report generation
+- Test suite (unit + integration)
+
+## [0.2.0] - 2025-10-12
+
+### Added - Sprint 0 Phase 2: Data Pipeline
+
+#### Data Ingestion
+- **US Market (`src/data/ingest_yf_us.py`)**:
+  - yfinance-based OHLCV data ingestion for S&P 500 constituents
+  - Parallel download with ThreadPoolExecutor (configurable workers)
+  - Retry logic with configurable attempts
+  - Adjustment factor computation (Adj Close / Close)
+  - Parquet file storage per ticker
+  - Wikipedia-based S&P 500 ticker list with fallback
+
+- **CN Market (`src/data/ingest_ts_cn.py`)**:
+  - Tushare Pro API integration for A-share data
+  - Chunked pagination for date ranges > 1000 days (handles API ~4000 row limit)
+  - Rate limiting between chunks (50ms delay)
+  - Thread-safe API instances per worker
+  - Adjustment factors via `pro.adj_factor()` with proper merging
+  - Volume/amount unit conversion (×100 shares, ×1000 CNY)
+  - ST stock filtering support
+  - Token authentication via environment variable or config
+
+#### Universe Construction (`src/data/build_universe.py`)
+- Monthly reconstitution at last trading day per region calendar
+- Eligibility filters: price ≥ $3.00, minimum 20-day ADV
+- Top N=800 selection by market cap proxy (close × volume)
+- Frozen-at-first-seen industry assignment (placeholder for Sprint 0)
+- pandas-market-calendars integration for NYSE/SSE trading days
+- Handles timezone-aware/naive datetime conversions
+
+#### Qlib Dataset Conversion (`src/data/build_qlib_dataset.py`)
+- Conversion from parquet to Qlib binary format
+- Integration with dump_bin module (`src/data/dump_bin.py`)
+- Required features: $open, $high, $low, $close, $volume, $change, $factor
+- Proper calendar and feature file generation
+- Handles missing adjustment factors (defaults to 1.0)
+
+#### Configuration
+- `configs/data_us.yaml`: US data ingestion parameters
+- `configs/data_cn.yaml`: CN data ingestion parameters with Tushare token support
+
+#### Makefile Targets
+- `make data_us`: Full US data pipeline (ingest → universe → qlib)
+- `make data_cn`: Full CN data pipeline (ingest → universe → qlib)
+
+### Technical Details
+- Parallel processing for data ingestion (ThreadPoolExecutor)
+- Robust error handling and retry mechanisms
+- Comprehensive logging with progress bars (tqdm)
+- Config normalization for datetime.date objects
+- Deterministic config hashing integration
+
+### Dependencies
+- pandas-market-calendars >= 4.0.0 (trading calendar management)
+- pyarrow >= 14.0.0 (Parquet support)
+- tushare >= 1.4.0 (CN market data)
+- yfinance >= 0.2.0 (US market data)
 
 ## [0.1.0] - 2025-10-12
 
@@ -30,7 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Machine Learning**: scikit-learn, xgboost
 - **Deep Learning** (optional): torch, stable-baselines3, gymnasium
 - **Statistical Models**: statsmodels, hmmlearn, arch (GARCH/DCC)
-- **Data Sources**: yfinance, akshare
+- **Data Sources**: yfinance, tushare
 
 #### Logging Infrastructure (`src/utils/logging.py`)
 - JSON line format with UTC timestamps

@@ -1,0 +1,51 @@
+# Backtest Configuration - CN
+# Sprint 0 - Section 1 specs (frozen)
+# Pyqlib backtest engine with performance metrics
+
+# Core identifiers
+region: CN
+random_state: 42
+
+# Backtest period
+start_date: "2020-01-01"
+end_date: "2025-06-30"
+
+# Qlib data provider
+provider_uri: data/qlib/cn_data
+
+# Executor configuration
+executor_type: SimulatorExecutor  # Qlib's simulator
+
+# Slippage model (S0: simple fixed bps; S2: realized shortfall)
+slippage_model:
+  type: fixed_bps
+  buy_slippage_bps: 5.0
+  sell_slippage_bps: 5.0
+
+# Trading parameters (CN market hours)
+trading:
+  start_time: "09:30:00"  # SSE market open
+  end_time: "15:00:00"    # SSE market close (午: 11:30-13:00)
+  trade_unit: stock       # vs dollar
+  limit_threshold: 0.10   # CN has 10% daily price limit
+
+# Initial capital
+capital: 65000000.0  # ≈ $10M USD equivalent (at ~6.5 CNY/USD)
+
+# Report metrics (per Sprint 0 spec acceptance tests)
+report_metrics:
+  - annual_return
+  - annual_volatility
+  - sharpe_ratio
+  - max_drawdown
+  - calmar_ratio
+  - turnover
+  - costs
+  - industry_exposures
+  - holdings
+
+# Output paths
+output:
+  portfolio_path: data/backtest/CN/portfolio.pkl
+  metrics_path: data/backtest/CN/metrics.json
+  report_html: reports/sprint0_CN/report.html

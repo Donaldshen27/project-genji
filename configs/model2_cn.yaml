@@ -1,0 +1,45 @@
+# Model 2 Training Configuration - CN
+# Sprint 0 - Section 1 specs (frozen)
+# Stock-level alpha forecasting with industry-relative returns
+
+# Core identifiers
+region: CN
+random_state: 42
+
+# Labels (industry-relative forward returns)
+labels:
+  type: industry_relative_returns
+  horizons: [21, 63]
+
+# Features (point-in-time aligned)
+features:
+  winsor_pct: [0.01, 0.99]
+  standardize_within: "industry"
+
+# Cross-validation scheme (CPCV with embargo - NON-NEGOTIABLE)
+cv_scheme:
+  type: combinatorial_purged_cv
+  n_splits: 5
+  embargo_days: 63
+
+# Models (base learners - frozen schema)
+models:
+  - ridge:
+      alpha: 3.0
+  - xgboost:
+      max_depth: 6
+      n_estimators: 400
+      eta: 0.05
+      subsample: 0.8
+      colsample_bytree: 0.8
+      min_child_weight: 3
+
+# Stacking
+stacking:
+  meta: ridge
+
+# Calibration
+calibration: "isotonic"
+
+# Neutralization
+neutralization: {style_neutral: true}

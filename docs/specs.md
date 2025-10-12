@@ -37,7 +37,7 @@ Below is a **production‑level, zero‑ambiguity** specification for **all spri
 
 ## 1) Sprint 0 — **Deterministic baseline (US & CN)** — *frozen* (already provided; made production‑grade here)
 
-**Objective (unchanged):** One‑command E2E baseline per region: data → Model 2 → risk/cost QP → Qlib backtest → HTML report. **No RL; no Model 1.** 
+**Objective (unchanged):** One‑command E2E baseline per region: data → Model 2 (theory.md) → risk/cost QP → Qlib backtest → HTML report. **No RL; no Model 1.** 
 
 **Deliverables & interfaces (authoritative)**
 
