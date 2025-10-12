@@ -1,7 +1,113 @@
 [project]
-name = "donald-trading-model"
+name = "quant-system"
 version = "0.1.0"
-description = "Add your description here"
+description = "Industry-aware equity trading system with regime detection and RL-based portfolio optimization"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    # Core data & backtesting
+    # Note: qlib 0.9.5+ supports Python 3.11, may need to install from source
+    "pyqlib>=0.9.5",
+
+    # Optimization
+    "cvxpy>=1.4.0",
+    "osqp>=0.6.0",
+    "clarabel>=0.7.0",
+
+    # Machine learning
+    "scikit-learn>=1.3.0",
+    "xgboost>=2.0.0",
+
+    # Data sources
+    "yfinance>=0.2.0",
+    "akshare>=1.13.0",
+
+    # Core scientific computing
+    # Using flexible numpy constraint compatible with qlib
+    "numpy>=1.21.0",
+    "pandas>=2.0.0",
+    "scipy>=1.11.0",
+
+    # Statistical models
+    "statsmodels>=0.14.0",
+    "hmmlearn>=0.3.0",
+    "arch>=6.2.0",  # For GARCH/DCC models
+
+    # Utilities
+    "pyyaml>=6.0",
+    "tqdm>=4.65.0",
+    "joblib>=1.3.0",
+    "pyarrow>=14.0.0",  # For Parquet support
+]
+
+[project.optional-dependencies]
+rl = [
+    "torch>=2.0.0",
+    "stable-baselines3>=2.0.0",
+    "gymnasium>=0.29.0",
+]
+dev = [
+    "ruff>=0.3.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.3.0",
+    "ipython>=8.12.0",
+    "jupyter>=1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "src/backtest",
+    "src/data",
+    "src/model1",
+    "src/model2",
+    "src/optimizer",
+    "src/rl",
+    "src/utils",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**/*.py" = ["F401", "F811"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --cov=src --cov-report=term-missing --cov-report=html"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "scripts/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    'if __name__ == "__main__":',
+    "if TYPE_CHECKING:",
+]
