@@ -51,6 +51,9 @@ Use this checklist whenever you receive a feature/documentation request (e.g. "i
 10. **Merge (human or CI).**  
     Open a pull request from `feature/<slug>` into `main`. Ensure Codex approval and any additional CI checks pass before merging.
 
+11. **Archive completed tickets.**  
+    Use `python3 scripts/archive_work_items.py --work-item <ID>` (or `--all`) to move finished work items into `tickets/archive/`, keeping `tickets/work_items.json` focused on active tasks.
+
 Use this document as your "prompt include" for the main context window:  
 `At subagent_workflow.md, implement this feature <feature A>.`  
 Claude Code will follow the steps above to keep every build consistent.***

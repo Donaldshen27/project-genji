@@ -30,6 +30,8 @@ make install
 ```bash
 # Optional before starting a new ticket: clear old patch packages/failures
 scripts/reset_workspace.sh
+# Archive completed work items to keep planning file light
+python3 scripts/archive_work_items.py --work-item <ID>
 ```
 
 ### Development Workflow
