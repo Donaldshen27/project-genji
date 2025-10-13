@@ -10,17 +10,16 @@ or pass in config file.
 import argparse
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
-import yaml
 import tushare as ts
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import yaml
 from tqdm import tqdm
 
-from src.utils.logging import setup_logging, get_logger
+from src.utils.logging import get_logger, setup_logging
 
 
 def normalize_config(raw_config: dict) -> dict:
@@ -30,6 +29,7 @@ def normalize_config(raw_config: dict) -> dict:
     YAML's safe_load() converts ISO dates (e.g., 2010-01-01) to datetime.date objects.
     This breaks compute_config_hash() which requires JSON-serializable types.
     """
+
     def normalize_value(value):
         if isinstance(value, (date, datetime)):
             return value.isoformat()
@@ -38,10 +38,11 @@ def normalize_config(raw_config: dict) -> dict:
         elif isinstance(value, list):
             return [normalize_value(item) for item in value]
         return value
+
     return {key: normalize_value(value) for key, value in raw_config.items()}
 
 
-def get_tushare_api(token: Optional[str] = None):
+def get_tushare_api(token: str | None = None):
     """
     Initialize Tushare Pro API with token.
 
@@ -93,7 +94,7 @@ def get_cn_universe_tickers(token: str) -> list[str]:
 
         # Get all A-share stock list
         # list_status: L=listed, D=delisted, P=paused
-        stock_info = pro.stock_basic(exchange='', list_status='L', fields='ts_code,name')
+        stock_info = pro.stock_basic(exchange="", list_status="L", fields="ts_code,name")
 
         # Filter out stocks with "ST" in name (special treatment stocks)
         stock_info = stock_info[~stock_info["name"].str.contains("ST", na=False)]
@@ -116,7 +117,9 @@ def get_cn_universe_tickers(token: str) -> list[str]:
         ]
 
 
-def chunk_date_range(start_date: str, end_date: str, chunk_days: int = 365) -> list[tuple[str, str]]:
+def chunk_date_range(
+    start_date: str, end_date: str, chunk_days: int = 365
+) -> list[tuple[str, str]]:
     """
     Split date range into smaller chunks to handle Tushare pagination limits.
 
@@ -140,10 +143,7 @@ def chunk_date_range(start_date: str, end_date: str, chunk_days: int = 365) -> l
     # Use <= to handle single-day ranges and ensure end date is included
     while current <= end:
         chunk_end = min(current + timedelta(days=chunk_days), end)
-        chunks.append((
-            current.strftime("%Y-%m-%d"),
-            chunk_end.strftime("%Y-%m-%d")
-        ))
+        chunks.append((current.strftime("%Y-%m-%d"), chunk_end.strftime("%Y-%m-%d")))
         current = chunk_end + timedelta(days=1)
 
     return chunks
@@ -155,7 +155,7 @@ def download_ticker_data(
     start_date: str,
     end_date: str,
     retry_attempts: int = 3,
-) -> Optional[pd.DataFrame]:
+) -> pd.DataFrame | None:
     """
     Download OHLCV data for single CN stock using Tushare API.
 
@@ -243,43 +243,45 @@ def download_ticker_data(
     # Merge adjustment factors if available
     if all_adj_dfs:
         df_adj = pd.concat(all_adj_dfs, ignore_index=True)
-        df = df.merge(df_adj[['trade_date', 'adj_factor']], on='trade_date', how='left')
-        df['adj_factor'] = df['adj_factor'].fillna(1.0)
+        df = df.merge(df_adj[["trade_date", "adj_factor"]], on="trade_date", how="left")
+        df["adj_factor"] = df["adj_factor"].fillna(1.0)
     else:
         logger.warning(f"{ticker}: No adjustment factors available, using 1.0")
-        df['adj_factor'] = 1.0
+        df["adj_factor"] = 1.0
 
     # Tushare column mapping:
     # trade_date -> date
     # open, high, low, close (raw prices)
     # vol -> volume (in shares, need to multiply by 100 for Tushare data)
     # amount -> amount (in 1000 CNY, need to multiply by 1000)
-    df = df.rename(columns={
-        'trade_date': 'date',
-        'vol': 'volume',
-    })
+    df = df.rename(
+        columns={
+            "trade_date": "date",
+            "vol": "volume",
+        }
+    )
 
     # Convert date to datetime
-    df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
-    df = df.set_index('date')
+    df["date"] = pd.to_datetime(df["date"], format="%Y%m%d")
+    df = df.set_index("date")
 
     # Remove duplicates (in case chunks overlapped)
-    df = df[~df.index.duplicated(keep='first')]
+    df = df[~df.index.duplicated(keep="first")]
 
     # Sort by date (ascending)
     df = df.sort_index()
 
     # Tushare volume is in 100 shares, convert to shares
-    df['volume'] = df['volume'] * 100
+    df["volume"] = df["volume"] * 100
 
     # Tushare amount is in 1000 CNY, convert to CNY
-    df['amount'] = df['amount'] * 1000
+    df["amount"] = df["amount"] * 1000
 
     # Compute adjusted close: adj_close = close * adj_factor
-    df['adj_close'] = df['close'] * df['adj_factor']
+    df["adj_close"] = df["close"] * df["adj_factor"]
 
     # Keep only required fields
-    required_cols = ['open', 'high', 'low', 'close', 'volume', 'amount', 'adj_close', 'adj_factor']
+    required_cols = ["open", "high", "low", "close", "volume", "amount", "adj_close", "adj_factor"]
     available_cols = [col for col in required_cols if col in df.columns]
     df = df[available_cols]
 
@@ -291,7 +293,7 @@ def save_ticker_data(ticker: str, df: pd.DataFrame, output_dir: Path) -> None:
     """Save ticker data to parquet file."""
     output_dir.mkdir(parents=True, exist_ok=True)
     # Use simplified ticker name for filename (remove .SZ/.SH suffix)
-    ticker_name = ticker.split('.')[0]
+    ticker_name = ticker.split(".")[0]
     output_path = output_dir / f"{ticker_name}.parquet"
     df.to_parquet(output_path)
 
@@ -372,7 +374,9 @@ def main():
         # Submit all download tasks with configurable retry attempts
         # Pass token instead of shared pro instance to avoid thread safety issues
         future_to_ticker = {
-            executor.submit(download_ticker_data, token, ticker, start_date, end_date, retry_attempts): ticker
+            executor.submit(
+                download_ticker_data, token, ticker, start_date, end_date, retry_attempts
+            ): ticker
             for ticker in tickers
         }
 
@@ -392,7 +396,7 @@ def main():
 
     logger.info(
         f"Download complete: {successful} successful, {failed} failed",
-        extra={"successful": successful, "failed": failed, "total": len(tickers)}
+        extra={"successful": successful, "failed": failed, "total": len(tickers)},
     )
 
     if successful == 0:
@@ -404,4 +408,5 @@ def main():
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

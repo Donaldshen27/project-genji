@@ -13,20 +13,20 @@ CLI: python -m src.data.build_universe --config configs/data_{region}.yaml --out
 import argparse
 from datetime import date, datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
-import yaml
 import pandas_market_calendars as mcal
+import yaml
 from tqdm import tqdm
 
-from src.utils.logging import setup_logging, get_logger
+from src.utils.logging import get_logger, setup_logging
 
 
 def normalize_config(raw_config: dict) -> dict:
     """
     Convert datetime.date objects to ISO strings for config hashing.
     """
+
     def normalize_value(value):
         if isinstance(value, (date, datetime)):
             return value.isoformat()
@@ -35,6 +35,7 @@ def normalize_config(raw_config: dict) -> dict:
         elif isinstance(value, list):
             return [normalize_value(item) for item in value]
         return value
+
     return {key: normalize_value(value) for key, value in raw_config.items()}
 
 
@@ -75,7 +76,7 @@ def get_month_end_dates(start_date: str, end_date: str, calendar_name: str) -> p
     return month_ends
 
 
-def load_ticker_data(ticker: str, instruments_dir: Path) -> Optional[pd.DataFrame]:
+def load_ticker_data(ticker: str, instruments_dir: Path) -> pd.DataFrame | None:
     """
     Load ticker data from parquet file.
 
@@ -231,14 +232,16 @@ def build_universe_at_date(
         volume = df.loc[recon_date, "volume"]
         market_cap_proxy = price * volume  # Simplified proxy for Sprint 0
 
-        eligible_stocks.append({
-            "date": recon_date,
-            "symbol": ticker,
-            "industry_id": industry_id,
-            "market_cap_proxy": market_cap_proxy,
-            "price": price,
-            "adv_usd": adv_usd.iloc[-1],
-        })
+        eligible_stocks.append(
+            {
+                "date": recon_date,
+                "symbol": ticker,
+                "industry_id": industry_id,
+                "market_cap_proxy": market_cap_proxy,
+                "price": price,
+                "adv_usd": adv_usd.iloc[-1],
+            }
+        )
 
     if not eligible_stocks:
         logger.warning(f"{recon_date.date()}: No eligible stocks found")
@@ -330,7 +333,7 @@ def main():
 
     logger.info(
         f"Universe construction complete: {len(df_final)} rows, {len(month_ends)} months",
-        extra={"output_path": str(output_path), "total_rows": len(df_final)}
+        extra={"output_path": str(output_path), "total_rows": len(df_final)},
     )
 
     return 0
@@ -338,4 +341,5 @@ def main():
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

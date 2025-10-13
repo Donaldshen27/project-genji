@@ -13,7 +13,7 @@ import json
 import logging
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -42,7 +42,7 @@ class JSONFormatter(logging.Formatter):
             JSON string representation of the log record
         """
         # Use the actual event time, not the formatting time
-        event_time = datetime.fromtimestamp(record.created, timezone.utc)
+        event_time = datetime.fromtimestamp(record.created, UTC)
 
         log_data = {
             "timestamp": event_time.isoformat(),

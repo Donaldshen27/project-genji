@@ -1,6 +1,6 @@
 # Phase 3: Model 2 Implementation Breakdown
 
-**CURRENT WORKING CHUNK: 1**
+**CURRENT WORKING CHUNK: 4**
 
 ## Overview
 
@@ -17,27 +17,27 @@ Implement complete E2E baseline pipeline: Data → Model 2 → QP Optimizer → 
 ---
 
 ## Chunk 1: Labels Module (`src/model2/labels.py`)
-- [ ] Create industry-relative forward returns function
-- [ ] Input: Qlib dataset, horizons=[21, 63]
-- [ ] Compute: `y_{i,t}^{(k)} = sum(r_{i,t+1:t+k}) - sum(R_ind_{i,t+1:t+k})`
-- [ ] Industry proxies: synthetic equal-weighted returns from universe
-- [ ] Output schema: `[date, instrument, label_21d, label_63d]`
-- [ ] No look-ahead: labels use only future returns, aligned to prediction date t
+- [x] Create industry-relative forward returns function
+- [x] Input: Qlib dataset, horizons=[21, 63]
+- [x] Compute: `y_{i,t}^{(k)} = sum(r_{i,t+1:t+k}) - sum(R_ind_{i,t+1:t+k})`
+- [x] Industry proxies: synthetic equal-weighted returns from universe
+- [x] Output schema: `[date, instrument, label_21d, label_63d]`
+- [x] No look-ahead: labels use only future returns, aligned to prediction date t
 
 ## Chunk 2: Features Module - Technical Only (`src/model2/features.py`)
-- [ ] Build technical features from Qlib price/volume data
-- [ ] Features: momentum (12-1, 1m reversal), MA gaps (20/50/200), RSI, realized vol, drawdown stats
-- [ ] Microstructure: volume ratios, turnover, Amihud illiquidity
-- [ ] Preprocessing: winsorize [1%, 99%], then industry z-score at each date
-- [ ] Output schema: `[date, instrument, feature_1, ..., feature_N]`
-- [ ] Handle missing: forward-fill (limit=5), then dropna
+- [x] Build technical features from Qlib price/volume data
+- [x] Features: momentum (12-1, 1m reversal), MA gaps (20/50/200), RSI, realized vol, drawdown stats
+- [x] Microstructure: volume ratios, turnover, Amihud illiquidity
+- [x] Preprocessing: winsorize [1%, 99%], then industry z-score at each date
+- [x] Output schema: `[date, instrument, feature_1, ..., feature_N]`
+- [x] Handle missing: forward-fill (limit=5), then dropna
 
 ## Chunk 3: CPCV Implementation (`src/model2/train.py` - Part 1)
-- [ ] TimeSeriesSplit with n_splits=5 (expanding window)
-- [ ] Purge logic: remove samples from train if label window overlaps test
-- [ ] Embargo: 63-day gap between train end and test start (NON-NEGOTIABLE)
-- [ ] Return: list of (train_idx, test_idx) tuples
-- [ ] Validate: no overlap within embargo window
+- [x] TimeSeriesSplit with n_splits=5 (expanding window)
+- [x] Purge logic: remove samples from train if label window overlaps test
+- [x] Embargo: 63-day gap between train end and test start (NON-NEGOTIABLE)
+- [x] Yield: (train_idx, test_idx) tuples via generator (sklearn-compatible)
+- [x] Validate: no overlap within embargo window
 
 ## Chunk 4: Base Models Training (`src/model2/train.py` - Part 2)
 - [ ] Ridge: alpha=3.0, random_state=42

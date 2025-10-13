@@ -6,18 +6,17 @@ CLI: python -m src.data.ingest_yf_us --config configs/data_us.yaml [--debug]
 
 import argparse
 import io
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Optional
 from urllib.request import Request, urlopen
 
 import pandas as pd
 import yaml
 import yfinance as yf
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
-from src.utils.logging import setup_logging, get_logger
+from src.utils.logging import get_logger, setup_logging
 
 
 def normalize_config(raw_config: dict) -> dict:
@@ -27,6 +26,7 @@ def normalize_config(raw_config: dict) -> dict:
     YAML's safe_load() converts ISO dates (e.g., 2003-01-01) to datetime.date objects.
     This breaks compute_config_hash() which requires JSON-serializable types.
     """
+
     def normalize_value(value):
         if isinstance(value, (date, datetime)):
             return value.isoformat()
@@ -35,6 +35,7 @@ def normalize_config(raw_config: dict) -> dict:
         elif isinstance(value, list):
             return [normalize_value(item) for item in value]
         return value
+
     return {key: normalize_value(value) for key, value in raw_config.items()}
 
 
@@ -52,7 +53,10 @@ def get_us_universe_tickers() -> list[str]:
         # Add User-Agent header to avoid 403 Forbidden from Wikipedia
         # Using urllib.request (stdlib) to avoid adding fsspec dependency
         req = Request(url)
-        req.add_header('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        req.add_header(
+            "User-Agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        )
 
         with urlopen(req, timeout=10) as response:
             # Decode bytes to string for pd.read_html
@@ -74,7 +78,7 @@ def download_ticker_data(
     start_date: str,
     end_date: str,
     retry_attempts: int = 3,
-) -> Optional[pd.DataFrame]:
+) -> pd.DataFrame | None:
     """
     Download OHLCV data for single ticker.
 
@@ -196,7 +200,9 @@ def main():
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all download tasks with configurable retry attempts
         future_to_ticker = {
-            executor.submit(download_ticker_data, ticker, start_date, end_date, retry_attempts): ticker
+            executor.submit(
+                download_ticker_data, ticker, start_date, end_date, retry_attempts
+            ): ticker
             for ticker in tickers
         }
 
@@ -216,7 +222,7 @@ def main():
 
     logger.info(
         f"Download complete: {successful} successful, {failed} failed",
-        extra={"successful": successful, "failed": failed, "total": len(tickers)}
+        extra={"successful": successful, "failed": failed, "total": len(tickers)},
     )
 
     if successful == 0:
@@ -228,4 +234,5 @@ def main():
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())
