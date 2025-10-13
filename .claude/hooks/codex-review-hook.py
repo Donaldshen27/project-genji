@@ -4,7 +4,9 @@ Codex Review Hook for Claude Code
 This script reviews code changes before they're applied using codex.
 """
 
+import datetime
 import json
+import os
 import re
 import subprocess
 import sys
@@ -112,6 +114,34 @@ def build_prompt(tool_name: str, tool_input: dict) -> str | None:
     return None
 
 
+def persist_review_output(tool_name: str, tool_input: dict, review_output: str) -> None:
+    base_dir = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
+    reviews_dir = os.path.join(base_dir, "codex_reviews")
+    os.makedirs(reviews_dir, exist_ok=True)
+
+    identifier = ""
+    if tool_name == "PatchPackage":
+        identifier = tool_input.get("ticket", "") or ""
+    else:
+        identifier = tool_input.get("file_path", "") or tool_input.get("file", "") or ""
+
+    if not identifier:
+        identifier = tool_name.lower() or "review"
+
+    slug = re.sub(r"[^a-zA-Z0-9_.-]+", "-", identifier).strip("-._") or "review"
+    timestamp = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    filename = f"{timestamp}_{slug}.txt"
+    path = os.path.join(reviews_dir, filename)
+
+    counter = 1
+    while os.path.exists(path):
+        path = os.path.join(reviews_dir, f"{timestamp}_{slug}_{counter}.txt")
+        counter += 1
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(review_output)
+
+
 def emit(decision: str, reason: str) -> None:
     print(
         json.dumps(
@@ -159,6 +189,8 @@ def main() -> None:
         )
     except Exception as exc:
         emit("deny", f"Error running codex: {exc}")
+
+    persist_review_output(tool_name, tool_input, review_output)
 
     approve_match = re.search(r"^APPROVE:\s*(.*)", review_output, flags=re.MULTILINE)
     if approve_match:
