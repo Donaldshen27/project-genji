@@ -1,6 +1,6 @@
 # Claude Code Ticket Workflow
 
-Use this checklist whenever you receive a feature request (e.g. "implement feature A").
+Use this checklist whenever you receive a feature/documentation request (e.g. "implement feature A").
 
 1. **Reset the workspace (optional but recommended).**  
    Run `scripts/reset_workspace.sh` if you want to clear stale patch packages before starting.

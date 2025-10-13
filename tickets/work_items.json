@@ -1,4 +1,162 @@
 {
-  "goal": "",
-  "modules": []
+  "goal": "SMK-001: Create smoketest.md file to validate patch-based workflow",
+  "ticket_key": "SMK-001",
+  "ticket_title": "Smoketest - Patch Workflow Verification",
+  "modules": [
+    {
+      "work_item_id": "SMK-001-001",
+      "title": "Create smoketest.md file",
+      "description": "Create a new file at repository root containing the text 'new workflow smoketest'",
+      "type": "file_creation",
+      "priority": "P0",
+      "estimated_tokens": 150,
+      "dependencies": [],
+      "blocks": [],
+      "inputs": {
+        "description": "None - hardcoded content",
+        "schema": null
+      },
+      "outputs": {
+        "description": "File created at repository root",
+        "schema": {
+          "file_path": "/home/donaldshen27/projects/donald_trading_model/smoketest.md",
+          "content": "new workflow smoketest\\n",
+          "encoding": "utf-8"
+        }
+      },
+      "contract": {
+        "preconditions": [
+          "Repository root directory exists",
+          "Write permissions available",
+          "File does not already exist"
+        ],
+        "postconditions": [
+          "File exists at specified path",
+          "Content matches exactly: 'new workflow smoketest\\n'",
+          "File has default permissions (0644)",
+          "Git status shows file as untracked or staged"
+        ],
+        "invariants": [
+          "No existing files are modified",
+          "No directories are created or removed",
+          "Only smoketest.md appears in git status"
+        ],
+        "error_conditions": [
+          {
+            "condition": "File already exists",
+            "handling": "Report error, do not overwrite"
+          },
+          {
+            "condition": "Permission denied",
+            "handling": "Report filesystem error"
+          },
+          {
+            "condition": "Invalid path",
+            "handling": "Report path validation error"
+          }
+        ]
+      },
+      "edge_cases": [
+        {
+          "case": "File already exists",
+          "expected_behavior": "Implementer should detect and report; do not overwrite"
+        },
+        {
+          "case": "Trailing whitespace",
+          "expected_behavior": "Content must have exactly one newline at end, no other whitespace"
+        },
+        {
+          "case": "Encoding issues",
+          "expected_behavior": "Use UTF-8 encoding explicitly"
+        }
+      ],
+      "implementation_notes": [
+        "Use JSON patch package format with 'create' operation",
+        "Include description field explaining this is a workflow smoketest",
+        "Add verification commands to patch metadata",
+        "Ensure POSIX-compliant newline at end of file"
+      ],
+      "test_strategy": {
+        "unit_tests": [],
+        "integration_tests": [
+          {
+            "test_name": "verify_file_exists",
+            "command": "test -f /home/donaldshen27/projects/donald_trading_model/smoketest.md",
+            "expected_exit_code": 0
+          },
+          {
+            "test_name": "verify_content_exact_match",
+            "command": "[ \"$(cat /home/donaldshen27/projects/donald_trading_model/smoketest.md)\" = \"new workflow smoketest\" ]",
+            "expected_exit_code": 0
+          },
+          {
+            "test_name": "verify_only_one_file_changed",
+            "command": "[ $(git -C /home/donaldshen27/projects/donald_trading_model status --short | wc -l) -eq 1 ]",
+            "expected_exit_code": 0
+          }
+        ],
+        "acceptance_tests": [
+          {
+            "test_name": "full_workflow_validation",
+            "steps": [
+              "ls -la /home/donaldshen27/projects/donald_trading_model/smoketest.md",
+              "cat /home/donaldshen27/projects/donald_trading_model/smoketest.md",
+              "git -C /home/donaldshen27/projects/donald_trading_model status --short"
+            ],
+            "expected_outcome": "File exists, contains correct content, appears in git status"
+          }
+        ]
+      },
+      "acceptance_criteria": [
+        "File /home/donaldshen27/projects/donald_trading_model/smoketest.md exists",
+        "File contains exactly: 'new workflow smoketest\\n'",
+        "git status shows only smoketest.md as changed",
+        "No other files modified (verified via git diff)",
+        "Patch package successfully applied by integration pipeline"
+      ],
+      "risks": [
+        {
+          "description": "File creation fails due to permissions",
+          "likelihood": "low",
+          "impact": "medium",
+          "mitigation": "Verify write permissions before patch application"
+        },
+        {
+          "description": "Git hook rejects commit",
+          "likelihood": "low",
+          "impact": "low",
+          "mitigation": "Ensure feature branch naming follows conventions"
+        }
+      ],
+      "related_files": [],
+      "related_contracts": [],
+      "estimated_complexity": "trivial"
+    }
+  ],
+  "total_work_items": 1,
+  "estimated_total_tokens": 150,
+  "critical_path": [
+    "SMK-001-001"
+  ],
+  "parallel_executable": [],
+  "cross_cutting_concerns": {
+    "error_handling": "Minimal - report failures clearly",
+    "logging": "Not required for this smoketest",
+    "testing": "Integration tests via bash commands",
+    "documentation": "Inline in patch package description"
+  },
+  "integration_points": {
+    "filesystem": "Write single file to repository root",
+    "git": "Track new file in version control",
+    "patch_pipeline": "Apply patch via integration hook"
+  },
+  "success_criteria": [
+    "All acceptance criteria met for SMK-001-001",
+    "Integrator subagent confirms validation",
+    "No unexpected side effects on codebase"
+  ],
+  "rollback_strategy": "Delete smoketest.md file; revert commit if already committed",
+  "spec_reference": "/home/donaldshen27/projects/donald_trading_model/docs/planning/spec.md",
+  "created_at": "2025-10-13",
+  "planner_version": "1.0"
 }

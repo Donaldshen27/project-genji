@@ -8,13 +8,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Current Status:** Sprint 0 foundation complete; core pipeline modules (data ingestion, models, optimizer, backtest) are stubs awaiting implementation.
 
+## Workflow Summary
+
+- Follow the ticket workflow in `subagent_workflow.md` for every request. Run planner → skeletoner → implementer (patch package in `patches/`) → optional integrator.
+- Never edit source files directly; only emit JSON patch packages (the hooks will reject direct writes).
+- Always work on a feature branch (`feature/<slug>`). The branch-policy hook blocks work on `main`.
+- The post-patch pipeline auto-applies patches, runs formatters/tests, and commits with `Integrate <ticket> via patch package`.
+
 ## Essential Commands
 
 ### Setup
 ```bash
+# One-time bootstrap (creates directories, ensures hooks executable)
+./setup.sh
 # Install all dependencies (always use locked mode)
 make install
 # or: uv sync --locked --all-extras --dev
+```
+
+### Workspace Hygiene
+```bash
+# Optional before starting a new ticket: clear old patch packages/failures
+scripts/reset_workspace.sh
 ```
 
 ### Development Workflow
@@ -252,6 +267,8 @@ print(f"Config hash: {config_hash}")
 ## Guardrails
 
 ### Never Do
+- Work directly on `main` or other protected branches
+- Edit repository files outside of a patch package JSON
 - Add new top-level directories without RFC
 - Change `pyproject.toml` dependencies without regenerating `uv.lock`
 - Run `uv sync` without `--locked` in automated scripts
@@ -260,6 +277,7 @@ print(f"Config hash: {config_hash}")
 - Commit secrets, API keys, or credentials
 
 ### Always Do
+- Use the planner → skeletoner → implementer flow for scoped tickets
 - Use `make format` before committing
 - Run `make test-cov` and verify ≥80% coverage
 - Include `random_state=42` in all model configs
