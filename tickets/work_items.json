@@ -1,33 +1,5 @@
 [
   {
-    "ticket_id": "P3C4-001-005",
-    "title": "OOF Prediction Aggregation",
-    "description": "Aggregate OOF predictions across CV folds into single DataFrame",
-    "module": "src/model2/base_models.py",
-    "dependencies": [],
-    "input": {
-      "description": "List of fold predictions",
-      "schema": "List[Tuple[np.ndarray indices, np.ndarray predictions, int fold_id]]"
-    },
-    "output": {
-      "description": "Aggregated OOF predictions",
-      "schema": "DataFrame with MultiIndex (instrument, datetime), columns [prediction, fold_id]"
-    },
-    "edge_cases": [
-      "Duplicate indices across folds: Raise ValueError with overlap info",
-      "Missing indices (incomplete coverage): Log warning with missing count",
-      "Empty fold: Skip fold, log warning",
-      "Prediction NaN: Raise ValueError with fold and index info"
-    ],
-    "tests": [
-      "test_oof_aggregation_full_coverage: Verify all indices present exactly once",
-      "test_oof_aggregation_duplicate_indices: Verify ValueError on overlapping folds",
-      "test_oof_aggregation_missing_indices: Verify warning logged for missing indices",
-      "test_oof_aggregation_nan_prediction: Verify ValueError on NaN predictions"
-    ],
-    "acceptance": "Aggregation handles 5 folds correctly, detects overlaps and gaps"
-  },
-  {
     "ticket_id": "P3C4-001-006",
     "title": "CV Training Loop Orchestrator",
     "description": "Orchestrate CV training loop for a single model-horizon pair",
