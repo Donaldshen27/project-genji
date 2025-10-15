@@ -7,7 +7,6 @@ import subprocess
 import sys
 from datetime import datetime
 
-
 PROTECTED_BRANCHES = {"main", "master", "HEAD"}
 PROJECT_ROOT = os.path.abspath(os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd()))
 

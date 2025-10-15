@@ -23,15 +23,15 @@ Use this checklist whenever you receive a feature/documentation request (e.g. "i
 
 6. **Implementer subagent (only after planner + skeletoner).**  
    Prompt:  
-   `Use the implementer subagent to implement Ticket: <KEY> - <short title>. Produce a patch package in patches/ with description/context summarising what you are changing and why, plus any tests.`  
-   Requirements for each patch package:
+   `Use the implementer subagent to implement Ticket: <KEY> - <short title>. Produce a JSON package in patches/ with description/context summarising what you are changing and why, plus any tests.`  
+   Requirements for each package:
    - Include `description` (and optionally `context`, `notes`, `summary`) so the Codex reviewer sees the rationale.
    - Add or update tests covering the change where possible.
-   - Only deliver JSON patch packages - no direct writes to source files.
+   - Emit full-file snapshots (`files`/`tests` arrays) instead of hand-written diffs. Never edit repository files directly.
 
 7. **Integration pipeline (automatic).**  
-   When the implementer writes the patch package, the PostToolUse hook will:
-   - Apply the diff
+   When the implementer writes the package, the PostToolUse hook will:
+   - Materialise the provided file contents and auto-generate diffs
    - Run formatters/lint (`ruff`, `black`)
    - Execute targeted tests
    - Invoke `codex-review-hook.py` with the patch metadata

@@ -1,162 +1,299 @@
-{
-  "goal": "SMK-001: Create smoketest.md file to validate patch-based workflow",
-  "ticket_key": "SMK-001",
-  "ticket_title": "Smoketest - Patch Workflow Verification",
-  "modules": [
-    {
-      "work_item_id": "SMK-001-001",
-      "title": "Create smoketest.md file",
-      "description": "Create a new file at repository root containing the text 'new workflow smoketest'",
-      "type": "file_creation",
-      "priority": "P0",
-      "estimated_tokens": 150,
-      "dependencies": [],
-      "blocks": [],
-      "inputs": {
-        "description": "None - hardcoded content",
-        "schema": null
-      },
-      "outputs": {
-        "description": "File created at repository root",
-        "schema": {
-          "file_path": "/home/donaldshen27/projects/donald_trading_model/smoketest.md",
-          "content": "new workflow smoketest\\n",
-          "encoding": "utf-8"
-        }
-      },
-      "contract": {
-        "preconditions": [
-          "Repository root directory exists",
-          "Write permissions available",
-          "File does not already exist"
-        ],
-        "postconditions": [
-          "File exists at specified path",
-          "Content matches exactly: 'new workflow smoketest\\n'",
-          "File has default permissions (0644)",
-          "Git status shows file as untracked or staged"
-        ],
-        "invariants": [
-          "No existing files are modified",
-          "No directories are created or removed",
-          "Only smoketest.md appears in git status"
-        ],
-        "error_conditions": [
-          {
-            "condition": "File already exists",
-            "handling": "Report error, do not overwrite"
-          },
-          {
-            "condition": "Permission denied",
-            "handling": "Report filesystem error"
-          },
-          {
-            "condition": "Invalid path",
-            "handling": "Report path validation error"
-          }
-        ]
-      },
-      "edge_cases": [
-        {
-          "case": "File already exists",
-          "expected_behavior": "Implementer should detect and report; do not overwrite"
-        },
-        {
-          "case": "Trailing whitespace",
-          "expected_behavior": "Content must have exactly one newline at end, no other whitespace"
-        },
-        {
-          "case": "Encoding issues",
-          "expected_behavior": "Use UTF-8 encoding explicitly"
-        }
-      ],
-      "implementation_notes": [
-        "Use JSON patch package format with 'create' operation",
-        "Include description field explaining this is a workflow smoketest",
-        "Add verification commands to patch metadata",
-        "Ensure POSIX-compliant newline at end of file"
-      ],
-      "test_strategy": {
-        "unit_tests": [],
-        "integration_tests": [
-          {
-            "test_name": "verify_file_exists",
-            "command": "test -f /home/donaldshen27/projects/donald_trading_model/smoketest.md",
-            "expected_exit_code": 0
-          },
-          {
-            "test_name": "verify_content_exact_match",
-            "command": "[ \"$(cat /home/donaldshen27/projects/donald_trading_model/smoketest.md)\" = \"new workflow smoketest\" ]",
-            "expected_exit_code": 0
-          },
-          {
-            "test_name": "verify_only_one_file_changed",
-            "command": "[ $(git -C /home/donaldshen27/projects/donald_trading_model status --short | wc -l) -eq 1 ]",
-            "expected_exit_code": 0
-          }
-        ],
-        "acceptance_tests": [
-          {
-            "test_name": "full_workflow_validation",
-            "steps": [
-              "ls -la /home/donaldshen27/projects/donald_trading_model/smoketest.md",
-              "cat /home/donaldshen27/projects/donald_trading_model/smoketest.md",
-              "git -C /home/donaldshen27/projects/donald_trading_model status --short"
-            ],
-            "expected_outcome": "File exists, contains correct content, appears in git status"
-          }
-        ]
-      },
-      "acceptance_criteria": [
-        "File /home/donaldshen27/projects/donald_trading_model/smoketest.md exists",
-        "File contains exactly: 'new workflow smoketest\\n'",
-        "git status shows only smoketest.md as changed",
-        "No other files modified (verified via git diff)",
-        "Patch package successfully applied by integration pipeline"
-      ],
-      "risks": [
-        {
-          "description": "File creation fails due to permissions",
-          "likelihood": "low",
-          "impact": "medium",
-          "mitigation": "Verify write permissions before patch application"
-        },
-        {
-          "description": "Git hook rejects commit",
-          "likelihood": "low",
-          "impact": "low",
-          "mitigation": "Ensure feature branch naming follows conventions"
-        }
-      ],
-      "related_files": [],
-      "related_contracts": [],
-      "estimated_complexity": "trivial"
-    }
-  ],
-  "total_work_items": 1,
-  "estimated_total_tokens": 150,
-  "critical_path": [
-    "SMK-001-001"
-  ],
-  "parallel_executable": [],
-  "cross_cutting_concerns": {
-    "error_handling": "Minimal - report failures clearly",
-    "logging": "Not required for this smoketest",
-    "testing": "Integration tests via bash commands",
-    "documentation": "Inline in patch package description"
+[
+  {
+    "ticket_id": "P3C4-001-003",
+    "title": "XGBoostTrainer Implementation",
+    "description": "Implement XGBoost trainer with frozen hyperparameters from specs",
+    "module": "src/model2/base_models.py",
+    "dependencies": [
+      "P3C4-001-001"
+    ],
+    "input": {
+      "description": "Training data",
+      "schema": "X: DataFrame (N_samples, N_features), y: Series (N_samples,)"
+    },
+    "output": {
+      "description": "Trained XGBoost model",
+      "schema": "Fitted xgboost.XGBRegressor object"
+    },
+    "edge_cases": [
+      "Insufficient samples for tree depth: XGBoost handles gracefully",
+      "Empty training set: Raise ValueError",
+      "y contains NaN: XGBoost raises, propagate error",
+      "Feature names with special chars: Sanitize feature names before training"
+    ],
+    "tests": [
+      "test_xgboost_trainer_fit: Verify fit on toy data",
+      "test_xgboost_trainer_predict: Verify predictions match expected shape",
+      "test_xgboost_trainer_feature_importance: Verify get_feature_importance() returns DataFrame with [feature, importance_gain, importance_weight]",
+      "test_xgboost_trainer_determinism: Two fits with same seed produce identical predictions (max diff < 1e-6)"
+    ],
+    "acceptance": "XGBoostTrainer trains successfully, extracts feature importance, predictions deterministic"
   },
-  "integration_points": {
-    "filesystem": "Write single file to repository root",
-    "git": "Track new file in version control",
-    "patch_pipeline": "Apply patch via integration hook"
+  {
+    "ticket_id": "P3C4-001-004",
+    "title": "ModelRegistry Configuration",
+    "description": "Create registry for base model configurations",
+    "module": "src/model2/model_registry.py",
+    "dependencies": [
+      "P3C4-001-002",
+      "P3C4-001-003"
+    ],
+    "input": {
+      "description": "Model name string",
+      "schema": "model_name: Literal['ridge', 'xgboost']"
+    },
+    "output": {
+      "description": "Trainer instance and hyperparameters",
+      "schema": "{'trainer': BaseModelTrainer, 'params': dict}"
+    },
+    "edge_cases": [
+      "Unknown model name: Raise KeyError with available models",
+      "Invalid hyperparameters in config: Raise ValueError with validation message"
+    ],
+    "tests": [
+      "test_registry_get_ridge: Verify Ridge config matches specs (alpha=3.0, random_state=42)",
+      "test_registry_get_xgboost: Verify XGBoost config matches specs (all 6 params correct)",
+      "test_registry_unknown_model: Verify KeyError raised for invalid model name",
+      "test_registry_list_models: Verify list_available_models() returns ['ridge', 'xgboost']"
+    ],
+    "acceptance": "Registry returns correct trainer and params for both models"
   },
-  "success_criteria": [
-    "All acceptance criteria met for SMK-001-001",
-    "Integrator subagent confirms validation",
-    "No unexpected side effects on codebase"
-  ],
-  "rollback_strategy": "Delete smoketest.md file; revert commit if already committed",
-  "spec_reference": "/home/donaldshen27/projects/donald_trading_model/docs/planning/spec.md",
-  "created_at": "2025-10-13",
-  "planner_version": "1.0"
-}
+  {
+    "ticket_id": "P3C4-001-005",
+    "title": "OOF Prediction Aggregation",
+    "description": "Aggregate OOF predictions across CV folds into single DataFrame",
+    "module": "src/model2/base_models.py",
+    "dependencies": [],
+    "input": {
+      "description": "List of fold predictions",
+      "schema": "List[Tuple[np.ndarray indices, np.ndarray predictions, int fold_id]]"
+    },
+    "output": {
+      "description": "Aggregated OOF predictions",
+      "schema": "DataFrame with MultiIndex (instrument, datetime), columns [prediction, fold_id]"
+    },
+    "edge_cases": [
+      "Duplicate indices across folds: Raise ValueError with overlap info",
+      "Missing indices (incomplete coverage): Log warning with missing count",
+      "Empty fold: Skip fold, log warning",
+      "Prediction NaN: Raise ValueError with fold and index info"
+    ],
+    "tests": [
+      "test_oof_aggregation_full_coverage: Verify all indices present exactly once",
+      "test_oof_aggregation_duplicate_indices: Verify ValueError on overlapping folds",
+      "test_oof_aggregation_missing_indices: Verify warning logged for missing indices",
+      "test_oof_aggregation_nan_prediction: Verify ValueError on NaN predictions"
+    ],
+    "acceptance": "Aggregation handles 5 folds correctly, detects overlaps and gaps"
+  },
+  {
+    "ticket_id": "P3C4-001-006",
+    "title": "CV Training Loop Orchestrator",
+    "description": "Orchestrate CV training loop for a single model-horizon pair",
+    "module": "src/model2/base_models.py",
+    "dependencies": [
+      "P3C4-001-004",
+      "P3C4-001-005"
+    ],
+    "input": {
+      "description": "Training data and CV splitter",
+      "schema": "X: DataFrame, y: Series, cv_splitter: PurgedEmbargoedTimeSeriesSplit, trainer: BaseModelTrainer"
+    },
+    "output": {
+      "description": "OOF predictions and trained final model",
+      "schema": "{'oof_predictions': DataFrame, 'final_model': BaseModelTrainer, 'cv_scores': List[dict]}"
+    },
+    "edge_cases": [
+      "CV fold too small: Validate min 100 samples per fold, raise ValueError",
+      "Training fails on fold: Log error, re-raise with fold context",
+      "All predictions in fold are outliers (>1000 bps): Log warning, continue",
+      "Final model training fails: Re-raise with full context"
+    ],
+    "tests": [
+      "test_cv_loop_full_pipeline: End-to-end with synthetic data (200 samples, 5 features, 3 folds)",
+      "test_cv_loop_small_fold: Verify ValueError when fold < 100 samples",
+      "test_cv_loop_cv_scores: Verify CV scores logged for all folds (metric='r2')",
+      "test_cv_loop_final_model: Verify final model trained on all data"
+    ],
+    "acceptance": "CV loop completes for both models, logs 5 fold scores, returns OOF predictions and final model"
+  },
+  {
+    "ticket_id": "P3C4-001-007",
+    "title": "Feature Importance Extraction and Logging",
+    "description": "Extract XGBoost feature importance and save to parquet",
+    "module": "src/model2/base_models.py",
+    "dependencies": [
+      "P3C4-001-003"
+    ],
+    "input": {
+      "description": "Trained XGBoost model",
+      "schema": "model: xgboost.XGBRegressor (fitted)"
+    },
+    "output": {
+      "description": "Feature importance DataFrame",
+      "schema": "DataFrame with columns [feature, importance_gain, importance_weight], sorted by importance_gain descending"
+    },
+    "edge_cases": [
+      "No features used (constant target): Return empty DataFrame",
+      "Feature names missing: Use default f0, f1, ... names",
+      "Zero importance for all features: Log warning, return full table"
+    ],
+    "tests": [
+      "test_feature_importance_extraction: Verify extraction from fitted XGBoost",
+      "test_feature_importance_sorting: Verify sorted by gain descending",
+      "test_feature_importance_schema: Verify matches FeatureImportance.schema.json",
+      "test_feature_importance_logging: Verify top 20 features logged at INFO level"
+    ],
+    "acceptance": "Feature importance extracted, saved to parquet, top 20 logged"
+  },
+  {
+    "ticket_id": "P3C4-001-008",
+    "title": "Model Persistence (Save/Load)",
+    "description": "Save trained models and OOF predictions to disk",
+    "module": "src/model2/base_models.py",
+    "dependencies": [
+      "P3C4-001-006"
+    ],
+    "input": {
+      "description": "Trained model and OOF predictions",
+      "schema": "model: BaseModelTrainer, oof_predictions: DataFrame, output_dir: Path"
+    },
+    "output": {
+      "description": "Files written to disk",
+      "schema": "{output_dir}/{model}_{horizon}.pkl, {output_dir}/oof/{model}_{horizon}.parquet"
+    },
+    "edge_cases": [
+      "Output directory doesn't exist: Create recursively",
+      "File already exists: Overwrite with warning",
+      "Disk full: Raise OSError with clear message",
+      "Corrupt model object: joblib raises, propagate with context"
+    ],
+    "tests": [
+      "test_save_model: Verify model saved to correct path",
+      "test_load_model: Verify loaded model produces identical predictions",
+      "test_save_oof_predictions: Verify OOF parquet written with correct schema",
+      "test_load_oof_predictions: Verify loaded DataFrame matches original"
+    ],
+    "acceptance": "Models and OOF predictions saved, can be loaded and produce identical results"
+  },
+  {
+    "ticket_id": "P3C4-001-009",
+    "title": "Multi-Horizon Training Wrapper",
+    "description": "Train all base models for both 21d and 63d horizons",
+    "module": "src/model2/base_models.py",
+    "dependencies": [
+      "P3C4-001-006",
+      "P3C4-001-007",
+      "P3C4-001-008"
+    ],
+    "input": {
+      "description": "Features, labels for both horizons, config",
+      "schema": "features: DataFrame, labels: DataFrame with [label_21d, label_63d], config: dict"
+    },
+    "output": {
+      "description": "Training results for all model-horizon pairs",
+      "schema": "Dict[Tuple[str, str], {'oof': DataFrame, 'model': BaseModelTrainer, 'cv_scores': List[dict]}]"
+    },
+    "edge_cases": [
+      "Label column missing: Raise KeyError with expected columns",
+      "Feature-label index mismatch: Inner join, log dropped count",
+      "Horizon fails mid-training: Log error, continue with other horizon",
+      "All models fail: Raise RuntimeError with summary"
+    ],
+    "tests": [
+      "test_multi_horizon_training_success: Verify all 4 model-horizon pairs train",
+      "test_multi_horizon_feature_label_join: Verify inner join on indices",
+      "test_multi_horizon_partial_failure: Verify continues on single model failure (if configured)",
+      "test_multi_horizon_all_outputs: Verify all 4 OOF files and 4 model files exist"
+    ],
+    "acceptance": "All 4 model-horizon pairs train successfully, all outputs saved"
+  },
+  {
+    "ticket_id": "P3C4-001-010",
+    "title": "CV Score Logging and Aggregation",
+    "description": "Log per-fold CV scores and compute aggregate statistics",
+    "module": "src/model2/base_models.py",
+    "dependencies": [
+      "P3C4-001-006"
+    ],
+    "input": {
+      "description": "Per-fold predictions and ground truth",
+      "schema": "y_true: np.ndarray, y_pred: np.ndarray, fold_id: int, model_name: str, horizon: str"
+    },
+    "output": {
+      "description": "CV score dict",
+      "schema": "{'model': str, 'horizon': str, 'fold_id': int, 'r2': float, 'mse': float, 'mae': float}"
+    },
+    "edge_cases": [
+      "y_true all constant: r2 = NaN, log warning",
+      "y_pred contains NaN: Raise ValueError before scoring",
+      "Metric computation fails: Log error, return None for that metric",
+      "Negative r2 (worse than mean): Log warning, keep value"
+    ],
+    "tests": [
+      "test_cv_score_computation: Verify r2, mse, mae computed correctly on toy data",
+      "test_cv_score_constant_target: Verify r2=NaN logged with warning",
+      "test_cv_score_logging_format: Verify logged dict matches CVScores.schema.json",
+      "test_cv_score_aggregation: Verify mean and std computed across folds"
+    ],
+    "acceptance": "CV scores computed for all folds, logged in JSON format, aggregated mean/std reported"
+  },
+  {
+    "ticket_id": "P3C4-001-011",
+    "title": "Determinism Validation Test",
+    "description": "Test that training with seed=42 produces identical results on repeat",
+    "module": "tests/unit/test_model2_base_models.py",
+    "dependencies": [
+      "P3C4-001-009"
+    ],
+    "input": {
+      "description": "Fixed synthetic dataset and config",
+      "schema": "X: DataFrame (100 samples, 10 features), y: Series (100 samples), config with random_state=42"
+    },
+    "output": {
+      "description": "Assertion that two runs produce identical OOF predictions",
+      "schema": "max_diff < 1e-9 for Ridge, max_diff < 1e-6 for XGBoost"
+    },
+    "edge_cases": [
+      "XGBoost GPU vs CPU: Only test CPU (GPU may have minor diffs)",
+      "Numerical precision: Allow 1e-6 tolerance for XGBoost due to floating point",
+      "Order of predictions: Sort by index before comparison"
+    ],
+    "tests": [
+      "test_ridge_determinism: Two runs produce identical Ridge OOF (max_diff < 1e-9)",
+      "test_xgboost_determinism: Two runs produce identical XGBoost OOF (max_diff < 1e-6)",
+      "test_cross_run_determinism: Full pipeline run twice produces identical all outputs"
+    ],
+    "acceptance": "Determinism test passes for both Ridge and XGBoost on synthetic data"
+  },
+  {
+    "ticket_id": "P3C4-001-012",
+    "title": "Integration with Existing Chunks (Labels, Features, CPCV)",
+    "description": "Integrate base model training with Chunks 1-3",
+    "module": "src/model2/train.py",
+    "dependencies": [
+      "P3C4-001-009"
+    ],
+    "input": {
+      "description": "Config dict from YAML",
+      "schema": "config: dict with keys [provider_uri, region, start_date, end_date, labels, features, cv_scheme, models]"
+    },
+    "output": {
+      "description": "Trained models and OOF predictions",
+      "schema": "All outputs from P3C4-001-009 saved to correct directories"
+    },
+    "edge_cases": [
+      "Labels and features have different date ranges: Use inner join",
+      "CPCV returns 0 splits: Raise ValueError with data range info",
+      "Config missing required keys: Raise KeyError with expected keys",
+      "Invalid model name in config: Raise ValueError from ModelRegistry"
+    ],
+    "tests": [
+      "test_integration_labels_features: Verify labels and features loaded and joined",
+      "test_integration_cpcv: Verify CPCV splitter created from config",
+      "test_integration_end_to_end: Full pipeline with small Qlib dataset (smoke test)",
+      "test_integration_config_validation: Verify required keys checked"
+    ],
+    "acceptance": "Integration test runs end-to-end with real Qlib data (small subset), all outputs saved"
+  }
+]

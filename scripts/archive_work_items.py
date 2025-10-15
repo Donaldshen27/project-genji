@@ -12,24 +12,24 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
-
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORK_ITEMS_PATH = REPO_ROOT / "tickets" / "work_items.json"
 ARCHIVE_DIR = REPO_ROOT / "tickets" / "archive"
 
 
-def load_work_items() -> dict:
+def load_work_items() -> Any:
     if not WORK_ITEMS_PATH.exists():
         raise FileNotFoundError(f"Missing {WORK_ITEMS_PATH}")
     with WORK_ITEMS_PATH.open("r", encoding="utf-8") as fh:
         return json.load(fh)
 
 
-def save_work_items(payload: dict) -> None:
+def save_work_items(payload: Any) -> None:
     with WORK_ITEMS_PATH.open("w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=2)
         fh.write("\n")
@@ -47,18 +47,21 @@ def sanitize_slug(raw: str | None) -> str:
     return slug or "ticket"
 
 
-def archive_modules(
-    ticket_payload: dict, archived: Iterable[dict], archive_file: Path
-) -> None:
+def archive_modules(ticket_payload: Any, archived: Iterable[dict], archive_file: Path) -> None:
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    ticket_key = None
+    if isinstance(ticket_payload, dict):
+        ticket_key = ticket_payload.get("ticket_key") or ticket_payload.get("goal")
     with archive_file.open("a", encoding="utf-8") as fh:
         for module in archived:
             fh.write(
                 json.dumps(
                     {
                         "archived_at": now,
-                        "ticket_key": ticket_payload.get("ticket_key"),
-                        "work_item_id": module.get("work_item_id"),
+                        "ticket_key": ticket_key,
+                        "work_item_id": module.get("work_item_id")
+                        or module.get("ticket_id")
+                        or module.get("id"),
                         "module": module,
                     }
                 )
@@ -82,9 +85,7 @@ def recompute_metadata(payload: dict, remaining_modules: list[dict]) -> None:
     }
 
     if isinstance(payload.get("critical_path"), list):
-        payload["critical_path"] = [
-            wid for wid in payload["critical_path"] if wid in remaining_ids
-        ]
+        payload["critical_path"] = [wid for wid in payload["critical_path"] if wid in remaining_ids]
 
     if isinstance(payload.get("parallel_executable"), list):
         payload["parallel_executable"] = [
@@ -93,9 +94,7 @@ def recompute_metadata(payload: dict, remaining_modules: list[dict]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Archive work items from tickets/work_items.json"
-    )
+    parser = argparse.ArgumentParser(description="Archive work items from tickets/work_items.json")
     parser.add_argument(
         "--work-item",
         "-w",
@@ -116,6 +115,16 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
+def extract_work_item_id(module: dict) -> str | None:
+    if not isinstance(module, dict):
+        return None
+    for key in ("work_item_id", "ticket_id", "id"):
+        value = module.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
 def main() -> int:
     args = parse_args()
 
@@ -125,23 +134,37 @@ def main() -> int:
         print(f"error: failed to read work items: {exc}", file=sys.stderr)
         return 1
 
-    modules = payload.get("modules")
+    container_type = None
+    modules: list[dict] | None = None
+    if isinstance(payload, dict):
+        candidate = payload.get("modules")
+        if isinstance(candidate, list):
+            modules = candidate
+            container_type = "dict"
+    elif isinstance(payload, list):
+        modules = payload
+        container_type = "list"
+
     if not isinstance(modules, list):
-        print("error: work_items.json missing 'modules' array", file=sys.stderr)
+        print("error: work_items.json missing iterable of work items", file=sys.stderr)
         return 1
 
     if args.all:
-        target_ids = {module.get("work_item_id") for module in modules if module.get("work_item_id")}
+        target_ids = {
+            extract_work_item_id(module) for module in modules if extract_work_item_id(module)
+        }
     else:
-        target_ids = set(args.work_items)
+        target_ids = {wid for wid in (args.work_items or []) if wid}
 
     if not target_ids:
         print("error: no valid work item IDs to archive", file=sys.stderr)
         return 1
 
-    modules_by_id = {
-        module.get("work_item_id"): module for module in modules if module.get("work_item_id")
-    }
+    modules_by_id: dict[str, dict] = {}
+    for module in modules:
+        wid = extract_work_item_id(module)
+        if wid:
+            modules_by_id[wid] = module
 
     missing_ids = [wid for wid in target_ids if wid not in modules_by_id]
     if missing_ids:
@@ -149,17 +172,26 @@ def main() -> int:
         return 1
 
     archived_modules = [modules_by_id[wid] for wid in target_ids]
-    remaining_modules = [m for m in modules if m.get("work_item_id") not in target_ids]
+    remaining_modules = [
+        module for module in modules if extract_work_item_id(module) not in target_ids
+    ]
 
     ensure_archive_dir()
-    ticket_slug = sanitize_slug(payload.get("ticket_key") or payload.get("goal"))
+    if container_type == "dict" and isinstance(payload, dict):
+        ticket_slug = sanitize_slug(payload.get("ticket_key") or payload.get("goal"))
+    else:
+        ticket_slug = "work-items"
     archive_path = ARCHIVE_DIR / f"{ticket_slug}.jsonl"
     archive_modules(payload, archived_modules, archive_path)
 
-    recompute_metadata(payload, remaining_modules)
+    if container_type == "dict" and isinstance(payload, dict):
+        recompute_metadata(payload, remaining_modules)
+        new_payload: Any = payload
+    else:
+        new_payload = remaining_modules
 
     try:
-        save_work_items(payload)
+        save_work_items(new_payload)
     except Exception as exc:
         print(f"error: failed to write updated work_items.json: {exc}", file=sys.stderr)
         return 1

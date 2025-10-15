@@ -1,4 +1,4 @@
-planner:    {max_tokens: 16000}
-skeletoner: {max_tokens: 14000}
-implementer:{max_tokens: 12000}
-integrator: {max_tokens: 10000}
+planner:    {max_tokens: 50000}
+skeletoner: {max_tokens: 50000}
+implementer: {max_tokens: 50000}
+integrator: {max_tokens: 50000}

@@ -1,186 +1,204 @@
-# SMK-001: Smoketest - Patch Workflow Verification
+# P3C4-001: Base Models Training (Model 2) - Specification
 
-## Overview
-This is a minimal smoketest ticket designed to verify the patch-based workflow infrastructure. The task requires creating a single new file `smoketest.md` at the repository root with specific content.
+## 1. Scope
 
-## Goal
-Validate that the subagent workflow (planner → skeletoner → implementer → integrator) can successfully:
-1. Plan a trivial file creation task
-2. Generate a patch package
-3. Apply the patch through the integration pipeline
-4. Verify the result
+Implement training of Ridge and XGBoost base models for Model 2 stock alpha forecasting (Chunk 4 of Phase 3). Generate out-of-fold predictions for two label horizons (21d, 63d) using CPCV splits from Chunk 3.
 
-## Scope
+### 1.1 In Scope
+- Ridge regression training (alpha=3.0, random_state=42)
+- XGBoost training (max_depth=6, n_estimators=400, eta=0.05, subsample=0.8, colsample=0.8, random_state=42)
+- Separate training for 21d and 63d horizons (4 models total: Ridge-21d, Ridge-63d, XGB-21d, XGB-63d)
+- OOF predictions using CPCV from Chunk 3
+- Per-fold CV score logging
+- XGBoost feature importance extraction and logging
+- Model persistence to disk
 
-### In Scope
-- Create `/home/donaldshen27/projects/donald_trading_model/smoketest.md`
-- Write exactly one line: "new workflow smoketest"
-- Validate file creation through git status
-- Confirm no side effects on existing codebase
+### 1.2 Out of Scope
+- Stacking/meta-learning (Chunk 5)
+- Isotonic calibration (Chunk 5)
+- Multi-horizon combination (Chunk 5)
+- Style neutralization (Chunk 6)
+- CLI integration (Chunk 7)
+- Acceptance tests (Chunk 8)
 
-### Out of Scope
-- Any modifications to existing files
-- Testing complex logic or multi-file changes
-- Integration with CI/CD pipelines
-- Documentation updates beyond the smoketest file itself
+### 1.3 Non-Goals
+- Hyperparameter tuning (parameters frozen per specs)
+- Alternative model architectures
+- Online/incremental learning
+- GPU acceleration
 
-## Non-Goals
-- Performance optimization
-- Error handling or edge cases
-- Multi-region support
-- Backward compatibility (this is a net-new file)
+## 2. Architecture
 
-## Modules & Interfaces
-
-### Module: File Creation
-**Purpose:** Create a single markdown file at repository root
-
-**Input:** None (hardcoded content)
-
-**Output:** File at `/home/donaldshen27/projects/donald_trading_model/smoketest.md`
-
-**Contract:**
-```yaml
-file_path: /home/donaldshen27/projects/donald_trading_model/smoketest.md
-content: "new workflow smoketest\n"
-encoding: utf-8
-permissions: 0644 (default)
+### 2.1 Module Structure
+```
+src/model2/
+├── train.py              # Main orchestrator (Chunks 3-7)
+├── base_models.py        # NEW: Base model training logic
+└── model_registry.py     # NEW: Model configuration registry
 ```
 
-**Dependencies:** None
+### 2.2 Core Components
 
-**Risk Assessment:**
-- **LOW:** File creation is atomic operation
-- **LOW:** No existing file will be overwritten (new file)
-- **LOW:** No code dependencies or imports required
+**BaseModelTrainer (Abstract)**
+- Interface for training individual models
+- Methods: `fit(X_train, y_train)`, `predict(X_test)`, `get_feature_importance()`
+- Implementations: `RidgeTrainer`, `XGBoostTrainer`
 
-## Architecture Decisions
+**ModelRegistry**
+- Central configuration for all base models
+- Maps model names to trainer classes and hyperparameters
+- Ensures reproducibility with seed propagation
 
-### AD-1: Single File Approach
-**Decision:** Use direct file write rather than template system
+**TrainingOrchestrator**
+- Coordinates CV loop, data preparation, model training
+- Aggregates OOF predictions across folds
+- Manages logging and persistence
 
-**Rationale:** 
-- Simplicity: No templating overhead for static content
-- Testability: Easy to verify exact content match
-- Clarity: Demonstrates minimal viable patch workflow
-
-**Alternatives Considered:**
-- Template-based approach: Rejected due to unnecessary complexity
-- Multi-file creation: Rejected to keep smoketest focused
-
-### AD-2: Root-Level Placement
-**Decision:** Place file at repository root rather than docs/ or tests/
-
-**Rationale:**
-- Visibility: Easily discoverable by developers
-- Isolation: No impact on organized directory structures
-- Cleanup: Can be git-ignored or removed after workflow validation
-
-## Test Strategy
-
-### Verification Criteria
-1. **File Exists:** `test -f /home/donaldshen27/projects/donald_trading_model/smoketest.md`
-2. **Content Match:** `[ "$(cat smoketest.md)" = "new workflow smoketest" ]`
-3. **Git Status:** File appears as untracked or staged
-4. **No Side Effects:** `git status` shows only smoketest.md changed
-
-### Test Execution
-```bash
-# Verify file creation
-ls -la /home/donaldshen27/projects/donald_trading_model/smoketest.md
-
-# Verify content
-cat /home/donaldshen27/projects/donald_trading_model/smoketest.md
-
-# Verify git tracking
-git -C /home/donaldshen27/projects/donald_trading_model status --short
+### 2.3 Data Flow
+```
+Input: Features (from Chunk 2) + Labels (from Chunk 1) + CPCV splits (from Chunk 3)
+  ↓
+For each horizon (21d, 63d):
+  For each model (Ridge, XGBoost):
+    For each CV fold (5 folds):
+      - Train on train_idx
+      - Predict on test_idx → OOF predictions
+      - Log fold score
+    - Aggregate OOF predictions
+    - Train final model on all data
+    - Save model + OOF predictions
 ```
 
-### Success Criteria
-- All 4 verification criteria pass
-- No errors during patch application
-- Integrator subagent confirms readiness
+## 3. Interfaces
 
-### Failure Scenarios
-- **File not created:** Check patch package syntax
-- **Wrong content:** Verify patch diff correctness
-- **Permission errors:** Check filesystem permissions
-- **Unexpected changes:** Review patch application logic
+### 3.1 Input Contracts
+- **Features**: DataFrame with MultiIndex (instrument, datetime), shape (N_samples, N_features)
+- **Labels**: DataFrame with MultiIndex (instrument, datetime), columns [label_21d, label_63d]
+- **CV Splitter**: PurgedEmbargoedTimeSeriesSplit instance from Chunk 3
 
-## Risks & Mitigations
+### 3.2 Output Contracts
 
-### Risk 1: Patch Application Failure
-**Likelihood:** Low  
-**Impact:** Medium (blocks workflow validation)  
-**Mitigation:** Use simple file creation (not modification) to minimize failure modes
+**OOF Predictions** (per model, per horizon)
+- Location: `data/model2/{region}/oof/{model}_{horizon}.parquet`
+- Schema:
+  - Index: MultiIndex (instrument, datetime)
+  - Columns: `[prediction, fold_id]`
+  - Type: float32 for predictions, int8 for fold_id
 
-### Risk 2: Git Hook Interference
-**Likelihood:** Medium  
-**Impact:** Low (may block commit but won't corrupt files)  
-**Mitigation:** Ensure branch-policy hook accepts feature branches; verify via `git status`
+**Trained Models**
+- Location: `models/model2_{region}/{model}_{horizon}.pkl`
+- Format: joblib pickle
+- Contents: scikit-learn/xgboost model object
 
-### Risk 3: File Already Exists
-**Likelihood:** Very Low  
-**Impact:** Low (implementer will see error)  
-**Mitigation:** Check file existence before patch generation; document expected state
+**Feature Importance** (XGBoost only)
+- Location: `models/model2_{region}/feature_importance_{horizon}.parquet`
+- Schema: `[feature: str, importance_gain: float32, importance_weight: float32]`
 
-## Dependencies
+**CV Scores Log**
+- Location: Logged via src.utils.logging
+- Format: JSON lines with keys: `model, horizon, fold_id, metric, value`
 
-### External
-- Git repository initialized (already met)
-- Write permissions on repository root (assumed)
+### 3.3 JSON Schema References
+Store output schemas in `/home/donaldshen27/projects/donald_trading_model/contracts/`:
+- `OOFPredictions.schema.json` (OOF predictions format)
+- `FeatureImportance.schema.json` (feature importance format)
+- `CVScores.schema.json` (CV scores logging format)
 
-### Internal
-- Patch integration pipeline configured (per subagent_workflow.md)
-- Implementer subagent available
+## 4. Acceptance Criteria
 
-### Blocked By
-None (this is a standalone task)
+### 4.1 Functional Requirements
+1. All 4 models (Ridge-21d, Ridge-63d, XGB-21d, XGB-63d) train successfully
+2. OOF predictions cover 100% of training data (no gaps after CV aggregation)
+3. Predictions are finite (no NaN, no Inf)
+4. Predictions within reasonable range: [-1000, +1000] bps
+5. Deterministic: Two runs with seed=42 produce identical OOF predictions (max diff < 1e-9)
 
-### Blocks
-None (this is a validation task, not a feature dependency)
+### 4.2 Performance Requirements
+1. Training time per region: ≤ 2 hours on 8 vCPU / 32 GB RAM
+2. Memory usage: peak RSS ≤ 24 GB
+3. Model files: total size < 500 MB per region
 
-## Acceptance Criteria
+### 4.3 Quality Requirements
+1. CV scores logged for all folds (5 folds × 2 horizons × 2 models = 20 entries)
+2. Feature importance extracted for XGBoost (top 20 features logged)
+3. No warnings from sklearn/xgboost (e.g., convergence issues)
 
-1. File `/home/donaldshen27/projects/donald_trading_model/smoketest.md` exists
-2. File contains exactly: `new workflow smoketest\n`
-3. `git status` shows the file as tracked/staged
-4. No other files modified (verified via `git diff --name-only`)
-5. Implementer produces valid patch package in `patches/`
-6. Integrator confirms successful validation
+## 5. Edge Cases & Error Handling
 
-## Implementation Notes
+### 5.1 Data Quality Issues
+- **Empty fold**: Raise ValueError with fold info
+- **Insufficient samples**: Validate min samples per fold (≥ 100) before training
+- **Label NaN in fold**: Drop samples with NaN labels, log count
 
-### For Skeletoner
-- Single work item: CREATE_SMOKETEST_FILE
-- No refactoring or multi-step coordination required
-- Document patch package location convention
+### 5.2 Model Training Issues
+- **Ridge singular matrix**: Use Ridge solver with regularization (guaranteed to work)
+- **XGBoost early stopping**: Disable early stopping (n_estimators fixed)
+- **OOM during XGBoost**: Reduce tree_method to 'hist' if default fails
 
-### For Implementer
-- Use JSON patch package format with `description` field
-- Include test commands in patch metadata
-- Ensure newline at end of file for POSIX compliance
+### 5.3 Prediction Issues
+- **Prediction NaN**: Raise ValueError, do not silently drop
+- **Prediction Inf**: Raise ValueError with model and fold info
+- **Outlier predictions**: Log warning if >1% of predictions exceed ±500 bps
 
-### For Integrator
-- Run all 4 verification criteria
-- Confirm git branch is feature/smk-001 (or similar)
-- Verify no unexpected files in `git status`
+## 6. Testing Strategy
 
-## Timeline Estimate
-- Planner: Complete (this document)
-- Skeletoner: ~1 minute (single work item)
-- Implementer: ~2 minutes (patch generation)
-- Integration: ~30 seconds (automated)
-- Integrator: ~1 minute (verification)
+### 6.1 Unit Tests (tickets/work_items.json)
+- `test_ridge_trainer`: Verify Ridge training and prediction
+- `test_xgboost_trainer`: Verify XGBoost training and prediction with feature importance
+- `test_oof_aggregation`: Verify OOF predictions cover all samples
+- `test_determinism`: Verify seed=42 produces identical results
 
-**Total:** ~5 minutes end-to-end
+### 6.2 Integration Tests
+- `test_full_cv_loop`: End-to-end CV training with synthetic data
+- `test_output_schemas`: Validate all outputs match JSON schemas
+- `test_model_persistence`: Save and load models, verify predictions match
 
-## References
-- Workflow: `/home/donaldshen27/projects/donald_trading_model/subagent_workflow.md`
-- Repository root: `/home/donaldshen27/projects/donald_trading_model/`
-- Patch directory: `/home/donaldshen27/projects/donald_trading_model/patches/`
+### 6.3 Smoke Tests
+- Train on small subset (100 samples, 2 folds) to verify pipeline
 
----
-**Spec Version:** 1.0  
-**Created:** 2025-10-13  
-**Ticket:** SMK-001
+## 7. Dependencies
+
+### 7.1 Upstream (Must Exist)
+- Chunk 1: `src/model2/labels.py` (build_labels_from_config)
+- Chunk 2: `src/model2/features.py` (build_features_from_config)
+- Chunk 3: `src/model2/train.py` (PurgedEmbargoedTimeSeriesSplit, create_cv_from_config)
+- `src/utils/logging.py` (setup_logging, get_logger)
+
+### 7.2 External Libraries
+- scikit-learn ≥ 1.3 (Ridge, model_selection)
+- xgboost ≥ 1.7 (XGBRegressor)
+- joblib (model persistence)
+- pandas ≥ 2.0
+- numpy ≥ 1.24
+
+## 8. Risks & Mitigations
+
+### 8.1 Risk: Training Time Exceeds Budget
+- **Likelihood**: Medium (XGBoost with 400 trees on large dataset)
+- **Impact**: High (blocks E2E pipeline)
+- **Mitigation**: Profile on subset, consider tree_method='hist', parallelize folds
+
+### 8.2 Risk: Memory Overflow
+- **Likelihood**: Low (Ridge is memory-efficient, XGBoost scales well)
+- **Impact**: High (OOM crashes)
+- **Mitigation**: Monitor RSS during development, use chunked prediction if needed
+
+### 8.3 Risk: Non-Determinism
+- **Likelihood**: Low (all seeds fixed)
+- **Impact**: High (reproducibility violated)
+- **Mitigation**: Test determinism explicitly, verify XGBoost seed propagation
+
+## 9. Open Questions (For Implementation)
+1. Should OOF predictions include confidence intervals?
+   → Deferred to Chunk 5 (variance estimation)
+2. Should we log training curves for XGBoost?
+   → Nice-to-have, not required for Chunk 4
+3. Should Ridge use cross-validation to select alpha?
+   → No, alpha=3.0 is frozen per specs
+
+## 10. Success Metrics
+- All 4 models saved to `models/model2_{region}/`
+- All 4 OOF prediction files exist and pass schema validation
+- Feature importance file exists for XGBoost
+- All CV scores logged (20 entries in logs)
+- Determinism test passes (identical predictions on re-run)

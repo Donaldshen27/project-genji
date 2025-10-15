@@ -10,10 +10,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Workflow Summary
 
-- Follow the ticket workflow in `subagent_workflow.md` for every request. Run planner → skeletoner → implementer (patch package in `patches/`) → optional integrator.
-- Never edit source files directly; only emit JSON patch packages (the hooks will reject direct writes).
+- Follow the ticket workflow in `subagent_workflow.md` for every request. Run planner → skeletoner → implementer (JSON package in `patches/`) → optional integrator.
+- Never edit source files directly; only emit JSON packages that contain full-file snapshots (the hooks will reject direct writes).
 - Always work on a feature branch (`feature/<slug>`). The branch-policy hook blocks work on `main`.
-- The post-patch pipeline auto-applies patches, runs formatters/tests, and commits with `Integrate <ticket> via patch package`.
+- The post-patch pipeline materialises the provided snapshots, auto-generates diffs, runs formatters/tests, and commits with `Integrate <ticket> via patch package`.
 
 ## Essential Commands
 

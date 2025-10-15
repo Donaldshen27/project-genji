@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CV Scores Schema",
+  "description": "Cross-validation scores per fold",
+  "type": "object",
+  "properties": {
+    "model": {
+      "type": "string",
+      "enum": ["ridge", "xgboost"],
+      "description": "Model type"
+    },
+    "horizon": {
+      "type": "string",
+      "enum": ["21d", "63d"],
+      "description": "Label horizon"
+    },
+    "fold_id": {
+      "type": "integer",
+      "description": "CV fold index",
+      "minimum": 0
+    },
+    "metric": {
+      "type": "string",
+      "enum": ["r2", "mse", "mae"],
+      "description": "Evaluation metric"
+    },
+    "value": {
+      "type": "number",
+      "description": "Metric value"
+    }
+  },
+  "required": ["model", "horizon", "fold_id", "metric", "value"]
+}

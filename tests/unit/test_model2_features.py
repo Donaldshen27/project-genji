@@ -52,7 +52,9 @@ def simple_price_volume_data():
         base_volume = 1_000_000
 
         # Create prices with trend and noise
-        inst_prices = [base_price * (1 + 0.001 * i + np.random.normal(0, 0.01)) for i in range(len(dates))]
+        inst_prices = [
+            base_price * (1 + 0.001 * i + np.random.normal(0, 0.01)) for i in range(len(dates))
+        ]
 
         # Create volumes
         inst_volumes = [base_volume * (1 + np.random.normal(0, 0.1)) for _ in range(len(dates))]
@@ -95,7 +97,7 @@ class TestComputeMomentumFeatures:
         """Test that 12-1 momentum excludes the most recent month."""
         # Create simple data: constant price growth
         dates = pd.date_range("2020-01-01", periods=300, freq="D")
-        prices = [100 * (1.001 ** i) for i in range(300)]
+        prices = [100 * (1.001**i) for i in range(300)]
 
         df = pd.DataFrame({"$close": prices}, index=dates)
         df.index.name = "datetime"
@@ -174,7 +176,7 @@ class TestComputeRSI:
         """Test RSI when all price changes are gains (RSI = 100)."""
         # Create constantly increasing prices
         dates = pd.date_range("2020-01-01", periods=50, freq="D")
-        prices = [100 * (1.01 ** i) for i in range(50)]
+        prices = [100 * (1.01**i) for i in range(50)]
 
         df = pd.DataFrame({"$close": prices}, index=dates)
         df.index.name = "datetime"

@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OOF Predictions Schema",
+  "description": "Out-of-fold predictions from base models for Model 2",
+  "type": "object",
+  "properties": {
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "instrument": {
+            "type": "string",
+            "description": "Stock ticker/identifier"
+          },
+          "datetime": {
+            "type": "string",
+            "format": "date",
+            "description": "Trading date (YYYY-MM-DD)"
+          },
+          "prediction": {
+            "type": "number",
+            "description": "Predicted industry-relative return in log units",
+            "minimum": -10.0,
+            "maximum": 10.0
+          },
+          "fold_id": {
+            "type": "integer",
+            "description": "CV fold index (0-4)",
+            "minimum": 0,
+            "maximum": 4
+          }
+        },
+        "required": ["instrument", "datetime", "prediction", "fold_id"]
+      }
+    }
+  },
+  "required": ["data"]
+}

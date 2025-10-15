@@ -64,9 +64,7 @@ def compute_momentum_features(df: pd.DataFrame, close_col: str = "$close") -> pd
         return result
 
     if isinstance(df.index, pd.MultiIndex):
-        features = df.groupby(level="instrument", group_keys=False).apply(
-            compute_for_instrument
-        )
+        features = df.groupby(level="instrument", group_keys=False).apply(compute_for_instrument)
     else:
         features = compute_for_instrument(df)
 
@@ -110,9 +108,7 @@ def compute_ma_gap_features(df: pd.DataFrame, close_col: str = "$close") -> pd.D
         return result
 
     if isinstance(df.index, pd.MultiIndex):
-        features = df.groupby(level="instrument", group_keys=False).apply(
-            compute_for_instrument
-        )
+        features = df.groupby(level="instrument", group_keys=False).apply(compute_for_instrument)
     else:
         features = compute_for_instrument(df)
 
@@ -183,9 +179,7 @@ def compute_rsi(df: pd.DataFrame, close_col: str = "$close", period: int = 14) -
         return pd.Series(rsi, index=group_df.index, name="rsi_14d")
 
     if isinstance(df.index, pd.MultiIndex):
-        rsi = df.groupby(level="instrument", group_keys=False).apply(
-            compute_for_instrument
-        )
+        rsi = df.groupby(level="instrument", group_keys=False).apply(compute_for_instrument)
     else:
         rsi = compute_for_instrument(df)
 
@@ -233,9 +227,7 @@ def compute_volatility_features(df: pd.DataFrame, close_col: str = "$close") -> 
         return result
 
     if isinstance(df.index, pd.MultiIndex):
-        features = df.groupby(level="instrument", group_keys=False).apply(
-            compute_for_instrument
-        )
+        features = df.groupby(level="instrument", group_keys=False).apply(compute_for_instrument)
     else:
         features = compute_for_instrument(df)
 
@@ -281,9 +273,9 @@ def compute_drawdown_features(df: pd.DataFrame, close_col: str = "$close") -> pd
             drawdowns = (window_prices - running_max) / running_max
             return drawdowns.min()
 
-        result["max_dd_252d"] = prices.rolling(
-            window=252, min_periods=252
-        ).apply(compute_max_dd, raw=False)
+        result["max_dd_252d"] = prices.rolling(window=252, min_periods=252).apply(
+            compute_max_dd, raw=False
+        )
 
         # Current drawdown from 63-day peak
         rolling_max_63 = prices.rolling(window=63, min_periods=63).max()
@@ -292,9 +284,7 @@ def compute_drawdown_features(df: pd.DataFrame, close_col: str = "$close") -> pd
         return result
 
     if isinstance(df.index, pd.MultiIndex):
-        features = df.groupby(level="instrument", group_keys=False).apply(
-            compute_for_instrument
-        )
+        features = df.groupby(level="instrument", group_keys=False).apply(compute_for_instrument)
     else:
         features = compute_for_instrument(df)
 
@@ -356,9 +346,7 @@ def compute_microstructure_features(
         return result
 
     if isinstance(df.index, pd.MultiIndex):
-        features = df.groupby(level="instrument", group_keys=False).apply(
-            compute_for_instrument
-        )
+        features = df.groupby(level="instrument", group_keys=False).apply(compute_for_instrument)
     else:
         features = compute_for_instrument(df)
 
@@ -670,7 +658,9 @@ def build_features_from_qlib(
 
     logger.info(f"Extended start date for lookback: {extended_start_date}")
     logger.info(f"Requested date range: {start_date} to {end_date}")
-    logger.info("Note: Data will be loaded from extended start date then trimmed to requested range")
+    logger.info(
+        "Note: Data will be loaded from extended start date then trimmed to requested range"
+    )
 
     # Load price and volume data from Qlib with extended window
     try:
@@ -701,9 +691,8 @@ def build_features_from_qlib(
     # Trim features to requested date range
     if isinstance(features.index, pd.MultiIndex):
         # Filter by datetime level
-        date_mask = (
-            (features.index.get_level_values("datetime") >= start_date)
-            & (features.index.get_level_values("datetime") <= end_date)
+        date_mask = (features.index.get_level_values("datetime") >= start_date) & (
+            features.index.get_level_values("datetime") <= end_date
         )
         features = features.loc[date_mask]
     else:
