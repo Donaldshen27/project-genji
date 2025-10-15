@@ -1,35 +1,5 @@
 [
   {
-    "ticket_id": "P3C4-001-003",
-    "title": "XGBoostTrainer Implementation",
-    "description": "Implement XGBoost trainer with frozen hyperparameters from specs",
-    "module": "src/model2/base_models.py",
-    "dependencies": [
-      "P3C4-001-001"
-    ],
-    "input": {
-      "description": "Training data",
-      "schema": "X: DataFrame (N_samples, N_features), y: Series (N_samples,)"
-    },
-    "output": {
-      "description": "Trained XGBoost model",
-      "schema": "Fitted xgboost.XGBRegressor object"
-    },
-    "edge_cases": [
-      "Insufficient samples for tree depth: XGBoost handles gracefully",
-      "Empty training set: Raise ValueError",
-      "y contains NaN: XGBoost raises, propagate error",
-      "Feature names with special chars: Sanitize feature names before training"
-    ],
-    "tests": [
-      "test_xgboost_trainer_fit: Verify fit on toy data",
-      "test_xgboost_trainer_predict: Verify predictions match expected shape",
-      "test_xgboost_trainer_feature_importance: Verify get_feature_importance() returns DataFrame with [feature, importance_gain, importance_weight]",
-      "test_xgboost_trainer_determinism: Two fits with same seed produce identical predictions (max diff < 1e-6)"
-    ],
-    "acceptance": "XGBoostTrainer trains successfully, extracts feature importance, predictions deterministic"
-  },
-  {
     "ticket_id": "P3C4-001-005",
     "title": "OOF Prediction Aggregation",
     "description": "Aggregate OOF predictions across CV folds into single DataFrame",
