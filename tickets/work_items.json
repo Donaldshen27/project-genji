@@ -30,35 +30,6 @@
     "acceptance": "XGBoostTrainer trains successfully, extracts feature importance, predictions deterministic"
   },
   {
-    "ticket_id": "P3C4-001-004",
-    "title": "ModelRegistry Configuration",
-    "description": "Create registry for base model configurations",
-    "module": "src/model2/model_registry.py",
-    "dependencies": [
-      "P3C4-001-002",
-      "P3C4-001-003"
-    ],
-    "input": {
-      "description": "Model name string",
-      "schema": "model_name: Literal['ridge', 'xgboost']"
-    },
-    "output": {
-      "description": "Trainer instance and hyperparameters",
-      "schema": "{'trainer': BaseModelTrainer, 'params': dict}"
-    },
-    "edge_cases": [
-      "Unknown model name: Raise KeyError with available models",
-      "Invalid hyperparameters in config: Raise ValueError with validation message"
-    ],
-    "tests": [
-      "test_registry_get_ridge: Verify Ridge config matches specs (alpha=3.0, random_state=42)",
-      "test_registry_get_xgboost: Verify XGBoost config matches specs (all 6 params correct)",
-      "test_registry_unknown_model: Verify KeyError raised for invalid model name",
-      "test_registry_list_models: Verify list_available_models() returns ['ridge', 'xgboost']"
-    ],
-    "acceptance": "Registry returns correct trainer and params for both models"
-  },
-  {
     "ticket_id": "P3C4-001-005",
     "title": "OOF Prediction Aggregation",
     "description": "Aggregate OOF predictions across CV folds into single DataFrame",
