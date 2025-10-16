@@ -8,8 +8,10 @@ import datetime
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 
 def review_prompt_for_edit(tool_input: dict) -> str:
@@ -142,6 +144,48 @@ def persist_review_output(tool_name: str, tool_input: dict, review_output: str) 
         f.write(review_output)
 
 
+def prepare_codex_env(project_dir: str) -> dict[str, str]:
+    """
+    Prepare an environment for codex that has a writable HOME.
+
+    Codex expects to create rollout/session artifacts under $HOME/.codex/.
+    In sandboxed environments $HOME may be read-only, so we redirect HOME
+    to a project-local directory and copy the minimal auth/config files.
+    """
+
+    env = os.environ.copy()
+    dst_home = Path(project_dir) / ".codex_workdir"
+    src_home = Path.home() / ".codex"
+
+    try:
+        dst_home.mkdir(parents=True, exist_ok=True)
+        # Create standard subdirectories Codex writes into.
+        for sub in ("rollouts", "sessions", "log"):
+            (dst_home / sub).mkdir(parents=True, exist_ok=True)
+
+        # Ensure codex auth/config files live under $HOME/.codex/.
+        codex_dir = dst_home / ".codex"
+        codex_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy credentials/config if present so Codex can authenticate.
+        for fname in ("auth.json", "config.toml", "internal_storage.json"):
+            src = src_home / fname
+            dst = codex_dir / fname
+            if src.exists():
+                try:
+                    shutil.copy2(src, dst)
+                except Exception:
+                    # Best effort; missing optional files should not block execution.
+                    pass
+    except Exception:
+        # Even if preparation fails we still override HOME so Codex can try writing.
+        pass
+
+    env["HOME"] = str(dst_home)
+    env.setdefault("XDG_CACHE_HOME", str(dst_home / ".cache"))
+    return env
+
+
 def emit(decision: str, reason: str) -> None:
     print(
         json.dumps(
@@ -172,12 +216,16 @@ def main() -> None:
     if prompt is None:
         emit("allow", f"Tool {tool_name} not configured for review")
 
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
+    codex_env = prepare_codex_env(project_dir)
+
     try:
         result = subprocess.run(
-            ["codex", "exec", prompt],
+            ["codex", "exec", prompt,"--yolo"],
             capture_output=True,
             text=True,
             timeout=1490,  # Leave 10 seconds before the 1500s hook timeout
+            env=codex_env,
         )
         review_output = result.stdout + result.stderr
     except subprocess.TimeoutExpired:
