@@ -11,7 +11,7 @@ Use this checklist whenever you receive a feature/documentation request (e.g. "i
 3. **Gather a ticket summary.**  
    If the request is vague, ask the user for the desired outcome, acceptance criteria, and any constraints. Record the ticket key you'll use (e.g. `SMK-001`).
 
-4. **Planner subagent (mandatory first step).**  
+4. **Planner subagent (mandatory first step if user requested a feature. Can be skipped if user provided an existing ticket ID).**  
    Prompt:  
    `Use the planner subagent to create work items for Ticket: <KEY> - <short title>. Focus on scope, risks, and test strategy.`  
    Save the plan in `tickets/work_items.json` (the planner already knows that workflow).

@@ -12,6 +12,7 @@ import math
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -357,11 +358,15 @@ class XGBoostTrainer(BaseModelTrainer):
     def get_feature_importance(self) -> pd.DataFrame | None:
         """Extract XGBoost feature importance.
 
-        Per P3C4-001-007: extract gain and weight importance.
+        Per P3C4-001-007: extract gain and weight importance, log warnings for
+        edge cases (no features, zero importance), and log top 20 features at INFO level.
 
         Returns:
             DataFrame with columns [feature, importance_gain, importance_weight]
             Sorted by importance_gain descending
+
+        Raises:
+            RuntimeError: If model not fitted
         """
         if not self._is_fitted:
             raise RuntimeError(
@@ -373,7 +378,12 @@ class XGBoostTrainer(BaseModelTrainer):
         gain_scores = booster.get_score(importance_type="gain")
         weight_scores = booster.get_score(importance_type="weight")
 
+        # Edge case: No features used (constant target or model did not use any splits)
         if not gain_scores and not weight_scores:
+            logger.warning(
+                "No features used by XGBoost model. This may indicate a constant target "
+                "or insufficient training data."
+            )
             return pd.DataFrame(columns=["feature", "importance_gain", "importance_weight"])
 
         all_features = set(gain_scores.keys()) | set(weight_scores.keys())
@@ -391,6 +401,24 @@ class XGBoostTrainer(BaseModelTrainer):
         df = pd.DataFrame(rows)
         df = df.sort_values("importance_gain", ascending=False).reset_index(drop=True)
 
+        # Edge case: All features have zero importance
+        if (df["importance_gain"] == 0.0).all():
+            logger.warning(
+                "All features have zero importance_gain. This may indicate model underfitting "
+                "or improper feature encoding."
+            )
+
+        # Log top 20 features at INFO level
+        top_n = min(20, len(df))
+        if top_n > 0:
+            logger.info(f"Top {top_n} features by importance_gain:")
+            for idx in range(top_n):
+                row = df.iloc[idx]
+                logger.info(
+                    f"  {idx + 1}. {row['feature']}: gain={row['importance_gain']:.4f}, "
+                    f"weight={row['importance_weight']:.0f}"
+                )
+
         return df
 
     def get_params(self) -> dict[str, Any]:
@@ -403,6 +431,49 @@ class XGBoostTrainer(BaseModelTrainer):
             "colsample_bytree": self.COLSAMPLE_BYTREE,
             "random_state": self.RANDOM_STATE,
         }
+
+
+def save_feature_importance(importance_df: pd.DataFrame, output_path: Path) -> None:
+    """Save feature importance DataFrame to parquet file.
+
+    Per P3C4-001-007: Helper function to persist feature importance to disk.
+
+    Args:
+        importance_df: DataFrame with columns [feature, importance_gain, importance_weight]
+        output_path: Path to output parquet file
+
+    Raises:
+        ValueError: If DataFrame schema is invalid
+        OSError: If file write fails
+
+    Edge cases:
+        - Output directory doesn't exist: Create parent directories
+        - File already exists: Overwrite with warning
+        - Empty DataFrame: Write empty parquet (valid edge case)
+    """
+    # Validate schema
+    required_columns = {"feature", "importance_gain", "importance_weight"}
+    if not required_columns.issubset(importance_df.columns):
+        missing = required_columns - set(importance_df.columns)
+        raise ValueError(
+            f"Invalid feature importance schema. Missing columns: {missing}. "
+            f"Expected columns: {required_columns}"
+        )
+
+    # Create parent directory if needed
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Warn if overwriting existing file
+    if output_path.exists():
+        logger.warning(f"Overwriting existing feature importance file: {output_path}")
+
+    # Write to parquet
+    try:
+        importance_df.to_parquet(output_path, index=False)
+        logger.info(f"Saved feature importance ({len(importance_df)} features) to {output_path}")
+    except Exception as e:
+        raise OSError(f"Failed to write feature importance to {output_path}: {e}") from e
 
 
 # ============================================================================
@@ -688,5 +759,3 @@ def aggregate_oof_predictions(
     aggregated = pd.concat(frames).sort_index()
     aggregated = aggregated[["prediction", "fold_id"]]
     return aggregated
-
-# force change

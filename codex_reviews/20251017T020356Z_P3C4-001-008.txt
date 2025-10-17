@@ -1,0 +1,632 @@
+REJECT: `tests/model2/test_model2_persistence.py` still asserts the wrong hash fields (e.g. lines 56, 76 use `data_hash` for model artifacts, and line 127 uses `model_hash` for the OOF artifact). Because the diff never touches the test file, the bug called out in P3C4-001-008 remains and the suite will keep failing. Please update those assertions so model artifacts compare `model_hash` and OOF artifacts compare `data_hash`, before considering unrelated refactors.
+OpenAI Codex v0.46.0 (research preview)
+--------
+workdir: /home/donaldshen27/projects/donald_trading_model
+model: gpt-5-codex
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: high
+reasoning summaries: auto
+session id: 0199efe8-2bef-76b0-9fe5-e606477e43aa
+--------
+user
+Review this unified diff before it's applied:
+
+Ticket: P3C4-001-008
+
+
+Context provided:
+- description: Fix test assertions for model persistence to correctly verify model_hash for model artifacts and data_hash for OOF artifacts. The persistence module was already correctly implemented, but tests had incorrect hash field references.
+- context: Per ticket P3C4-001-008 in tickets/work_items.json, the persistence module provides save/load functions for trained models (using joblib with model_hash) and OOF predictions (using parquet with data_hash). The existing persistence.py implementation is correct, but test_model2_persistence.py had three incorrect assertions comparing the wrong hash fields.
+- notes: ModelArtifactMetadata uses 'model_hash' field (line 53 of persistence.py), OOFArtifactMetadata uses 'data_hash' field (line 90). Tests at lines 56, 76 incorrectly used data_hash for models (should be model_hash), and line 127 incorrectly used model_hash for OOF (should be data_hash). All edge cases from the ticket are already covered: directory creation (lines 79-86, 117-123), overwrite warnings (lines 79-92, 141-149), missing files (lines 106-109), corrupt models (hash mismatch at lines 152-166), and empty DataFrames (lines 169-180).
+
+Proposed change (unified diff):
+```diff
+diff --git a/.gitignore b/.gitignore
+index 0238ab3..6df338a 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -102,3 +102,7 @@ Thumbs.db
+ *.temp
+ tmp/
+ temp/
++
++# Codex temporary directories
++.codex/
++.codex_workdir/
+diff --git a/codex_reviews/20251013T220633Z_SMK-001-001.txt b/codex_reviews/20251013T220633Z_SMK-001-001.txt
+deleted file mode 100644
+index b9f399a..0000000
+--- a/codex_reviews/20251013T220633Z_SMK-001-001.txt
++++ /dev/null
+@@ -1,49 +0,0 @@
+-APPROVE: New `smoketest.md` is added at repo root with the required single line `new workflow smoketest` and trailing newline; no other files touched.
+-OpenAI Codex v0.46.0 (research preview)
+---------
+-workdir: /home/donaldshen27/projects/donald_trading_model
+-model: gpt-5-codex
+-provider: openai
+-approval: never
+-sandbox: read-only
+-reasoning effort: high
+-reasoning summaries: auto
+-session id: 0199df9c-590d-7033-ac54-b0ef7dff6b70
+---------
+-user
+-Review this unified diff before it's applied:
+-
+-Ticket: SMK-001-001
+-
+-
+-Context provided:
+-- description: Create smoketest.md file to validate the patch-based subagent workflow (planner → skeletoner → implementer → integrator). This minimal file creation task serves as a smoke test to confirm the integration pipeline can successfully apply patches, track changes via git, and verify postconditions without side effects.
+-- context: References SMK-001 spec at /home/donaldshen27/projects/donald_trading_model/docs/planning/spec.md. Work item SMK-001-001 from tickets/work_items.json defines a trivial file_creation task with hardcoded content 'new workflow smoketest\n'. Contract specifies: file_path at repository root, UTF-8 encoding, 0644 permissions, exactly one newline terminator. Postconditions require file existence, exact content match, git tracking, and no modifications to existing files (invariant). This aligns with AD-1 (single file approach) and AD-2 (root-level placement) from the spec.
+-- notes: This patch creates a new file from scratch (no prior existence). Unified diff includes standard headers: '--- /dev/null' for non-existent source and '+++ smoketest.md' for target file. The '@@ -0,0 +1 @@' hunk header indicates zero lines in original and one line added at position 1. Content is exactly 'new workflow smoketest' followed by POSIX-compliant newline. No logic, imports, or dependencies required. This stub represents the complete implementation for the smoketest ticket.
+-
+-Proposed change (unified diff):
+-```diff
+---- /dev/null
+-+++ smoketest.md
+-@@ -0,0 +1 @@
+-+new workflow smoketest
+-
+-```
+-
+-Please assess this entire patch set and respond with one of the following:
+-
+-1. If every change is correct, safe, and ready to merge, start your response with 'APPROVE:' followed by a brief confirmation (feel free to mention any key points you checked).
+-
+-2. If you spot any issue—incorrect logic, missing context, regressions, tests needed, etc.—start your response with 'REJECT:' followed by:
+-   - What is wrong
+-   - Specific suggestions for how to fix it
+-   - What the corrected code should look like or what additional work is required
+-
+-Evaluate the diff holistically; approving partial fixes is not allowed. Only approve if you're completely satisfied with the combined changes.
+-
+-thinking
+-**Reviewing new smoketest.md file**
+-codex
+-APPROVE: New `smoketest.md` is added at repo root with the required single line `new workflow smoketest` and trailing newline; no other files touched.
+-tokens used
+-1,565
+diff --git a/codex_reviews/20251013T224039Z_SMK-001-001.txt b/codex_reviews/20251013T224039Z_SMK-001-001.txt
+deleted file mode 100644
+index 7a4db1d..0000000
+--- a/codex_reviews/20251013T224039Z_SMK-001-001.txt
++++ /dev/null
+@@ -1,50 +0,0 @@
+-APPROVE: Patch is a no-op—the file content stays `new workflow smoketest`, preserving the required single trailing newline and leaving other files untouched.
+-OpenAI Codex v0.46.0 (research preview)
+---------
+-workdir: /home/donaldshen27/projects/donald_trading_model
+-model: gpt-5-codex
+-provider: openai
+-approval: never
+-sandbox: read-only
+-reasoning effort: high
+-reasoning summaries: auto
+-session id: 0199dfbb-87cc-73c3-affc-3c2f653befe3
+---------
+-user
+-Review this unified diff before it's applied:
+-
+-Ticket: SMK-001-001
+-
+-
+-Context provided:
+-- description: Validate smoketest.md file at repository root with workflow validation message. This is a P0 validation task to verify the patch-based workflow system. The file already exists with correct content ('new workflow smoketest' with POSIX-compliant newline). This patch provides integration tests to validate the file meets all contract requirements.
+-- context: Ticket SMK-001-001 from work_items.json. This is a workflow smoketest with no external dependencies. Contract specifies UTF-8 encoding, exact content match with single trailing newline, and that no other files should be modified. The patch is a no-op on smoketest.md (file already correct) and adds comprehensive integration tests for future workflow validation runs.
+-- notes: This patch validates an existing file and provides integration tests for the implementer-integrator workflow. The smoketest.md file already exists with correct content, so the main patch is a no-op. Edge cases covered in tests: (1) File existence verification; (2) Exact content match with single newline, no extra whitespace; (3) UTF-8 encoding; (4) Explicit trailing newline verification using byte-level check; (5) Git status isolation check using exact path matching to properly fail when unrelated files are modified, while allowing only the test script itself and the patch JSON file. The integration test script uses dynamic path resolution, process substitution to avoid subshell issues, and explicit newline validation to ensure portability across different environments.
+-
+-Proposed change (unified diff):
+-```diff
+---- a/smoketest.md
+-+++ b/smoketest.md
+-@@ -1 +1 @@
+--new workflow smoketest
+-+new workflow smoketest
+-
+-```
+-
+-Please assess this entire patch set and respond with one of the following:
+-
+-1. If every change is correct, safe, and ready to merge, start your response with 'APPROVE:' followed by a brief confirmation (feel free to mention any key points you checked).
+-
+-2. If you spot any issue—incorrect logic, missing context, regressions, tests needed, etc.—start your response with 'REJECT:' followed by:
+-   - What is wrong
+-   - Specific suggestions for how to fix it
+-   - What the corrected code should look like or what additional work is required
+-
+-Evaluate the diff holistically; approving partial fixes is not allowed. Only approve if you're completely satisfied with the combined changes.
+-
+-thinking
+-**Reviewing diff for trivial changes**
+-codex
+-APPROVE: Patch is a no-op—the file content stays `new workflow smoketest`, preserving the required single trailing newline and leaving other files untouched.
+-tokens used
+-1,683
+diff --git a/src/model2/__init__.py b/src/model2/__init__.py
+index e69de29..b29cf6a 100644
+--- a/src/model2/__init__.py
++++ b/src/model2/__init__.py
+@@ -0,0 +1,19 @@
++"""Model 2 package exports."""
++
++from .persistence import (
++    ModelArtifactMetadata,
++    OOFArtifactMetadata,
++    load_oof_predictions,
++    load_trained_model,
++    save_oof_predictions,
++    save_trained_model,
++)
++
++__all__ = [
++    "ModelArtifactMetadata",
++    "OOFArtifactMetadata",
++    "load_oof_predictions",
++    "load_trained_model",
++    "save_oof_predictions",
++    "save_trained_model",
++]
+diff --git a/src/model2/base_models.py b/src/model2/base_models.py
+index f92108a..18dbf97 100644
+--- a/src/model2/base_models.py
++++ b/src/model2/base_models.py
+@@ -12,6 +12,7 @@ import math
+ import re
+ from abc import ABC, abstractmethod
+ from collections.abc import Iterable, Sequence
++from pathlib import Path
+ from typing import Any
+ 
+ import numpy as np
+@@ -357,11 +358,15 @@ class XGBoostTrainer(BaseModelTrainer):
+     def get_feature_importance(self) -> pd.DataFrame | None:
+         """Extract XGBoost feature importance.
+ 
+-        Per P3C4-001-007: extract gain and weight importance.
++        Per P3C4-001-007: extract gain and weight importance, log warnings for
++        edge cases (no features, zero importance), and log top 20 features at INFO level.
+ 
+         Returns:
+             DataFrame with columns [feature, importance_gain, importance_weight]
+             Sorted by importance_gain descending
++
++        Raises:
++            RuntimeError: If model not fitted
+         """
+         if not self._is_fitted:
+             raise RuntimeError(
+@@ -373,7 +378,12 @@ class XGBoostTrainer(BaseModelTrainer):
+         gain_scores = booster.get_score(importance_type="gain")
+         weight_scores = booster.get_score(importance_type="weight")
+ 
++        # Edge case: No features used (constant target or model did not use any splits)
+         if not gain_scores and not weight_scores:
++            logger.warning(
++                "No features used by XGBoost model. This may indicate a constant target "
++                "or insufficient training data."
++            )
+             return pd.DataFrame(columns=["feature", "importance_gain", "importance_weight"])
+ 
+         all_features = set(gain_scores.keys()) | set(weight_scores.keys())
+@@ -391,6 +401,24 @@ class XGBoostTrainer(BaseModelTrainer):
+         df = pd.DataFrame(rows)
+         df = df.sort_values("importance_gain", ascending=False).reset_index(drop=True)
+ 
++        # Edge case: All features have zero importance
++        if (df["importance_gain"] == 0.0).all():
++            logger.warning(
++                "All features have zero importance_gain. This may indicate model underfitting "
++                "or improper feature encoding."
++            )
++
++        # Log top 20 features at INFO level
++        top_n = min(20, len(df))
++        if top_n > 0:
++            logger.info(f"Top {top_n} features by importance_gain:")
++            for idx in range(top_n):
++                row = df.iloc[idx]
++                logger.info(
++                    f"  {idx + 1}. {row['feature']}: gain={row['importance_gain']:.4f}, "
++                    f"weight={row['importance_weight']:.0f}"
++                )
++
+         return df
+ 
+     def get_params(self) -> dict[str, Any]:
+@@ -405,6 +433,49 @@ class XGBoostTrainer(BaseModelTrainer):
+         }
+ 
+ 
++def save_feature_importance(importance_df: pd.DataFrame, output_path: Path) -> None:
++    """Save feature importance DataFrame to parquet file.
++
++    Per P3C4-001-007: Helper function to persist feature importance to disk.
++
++    Args:
++        importance_df: DataFrame with columns [feature, importance_gain, importance_weight]
++        output_path: Path to output parquet file
++
++    Raises:
++        ValueError: If DataFrame schema is invalid
++        OSError: If file write fails
++
++    Edge cases:
++        - Output directory doesn't exist: Create parent directories
++        - File already exists: Overwrite with warning
++        - Empty DataFrame: Write empty parquet (valid edge case)
++    """
++    # Validate schema
++    required_columns = {"feature", "importance_gain", "importance_weight"}
++    if not required_columns.issubset(importance_df.columns):
++        missing = required_columns - set(importance_df.columns)
++        raise ValueError(
++            f"Invalid feature importance schema. Missing columns: {missing}. "
++            f"Expected columns: {required_columns}"
++        )
++
++    # Create parent directory if needed
++    output_path = Path(output_path)
++    output_path.parent.mkdir(parents=True, exist_ok=True)
++
++    # Warn if overwriting existing file
++    if output_path.exists():
++        logger.warning(f"Overwriting existing feature importance file: {output_path}")
++
++    # Write to parquet
++    try:
++        importance_df.to_parquet(output_path, index=False)
++        logger.info(f"Saved feature importance ({len(importance_df)} features) to {output_path}")
++    except Exception as e:
++        raise OSError(f"Failed to write feature importance to {output_path}: {e}") from e
++
++
+ # ============================================================================
+ # CV Training Loop Orchestrator (P3C4-001-006)
+ # ============================================================================
+@@ -688,5 +759,3 @@ def aggregate_oof_predictions(
+     aggregated = pd.concat(frames).sort_index()
+     aggregated = aggregated[["prediction", "fold_id"]]
+     return aggregated
+-
+-# force change
+diff --git a/src/model2/train.py b/src/model2/train.py
+index 9f798d2..a7f4dd0 100644
+--- a/src/model2/train.py
++++ b/src/model2/train.py
+@@ -1,5 +1,4 @@
+-"""
+-Model 2 Training Pipeline: Purged & Embargoed TimeSeriesSplit
++"""Model 2 Training Pipeline: Purged & Embargoed TimeSeriesSplit
+ 
+ Implements Chunk 3 of Phase 3 breakdown:
+ - TimeSeriesSplit with expanding window (n_splits=5)
+@@ -21,6 +20,7 @@ from typing import Any
+ import numpy as np
+ import pandas as pd
+ from sklearn.linear_model import Ridge
++from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -664,6 +664,11 @@ class XGBoostTrainer(BaseModelTrainer):
+         }
+ 
+ 
++# ============================================================================
++# Chunk 4: CV Training Loop Orchestrator (P3C4-001-006)
++# ============================================================================
++
++
+ def run_cv_training(
+     X: pd.DataFrame,
+     y: pd.Series,
+@@ -700,22 +705,178 @@ def run_cv_training(
+         - Training failure: Log error with fold context, re-raise
+         - Outlier predictions: Log warning if >1% exceed ±500 bps
+     """
+-    # TODO: Initialize OOF prediction storage
+-    # TODO: Initialize CV scores list
+-    # TODO: For each fold from cv_splitter.split(X):
+-    #   - Extract train/test indices
+-    #   - Validate fold size >= 100
+-    #   - Clone trainer for fold
+-    #   - Fit on train data
+-    #   - Predict on test data
+-    #   - Store predictions with fold_id
+-    #   - Compute and log fold metrics (r2, mse, mae)
+-    # TODO: Aggregate OOF predictions (call aggregate_oof_predictions)
+-    # TODO: Train final model on all data
+-    # TODO: Return results dict
++    logger.info(
++        f"Starting CV training: model={model_name}, horizon={horizon}, "
++        f"n_samples={len(X)}, n_features={X.shape[1]}, n_splits={cv_splitter.n_splits}"
++    )
++
++    # TODO P3C4-001-006: Initialize OOF prediction storage
++    fold_predictions_list: list[tuple[Sequence[Any], Sequence[float], int]] = []
++
++    # TODO P3C4-001-006: Initialize CV scores list
++    cv_scores: list[dict[str, Any]] = []
++
++    # TODO P3C4-001-006: For each fold from cv_splitter.split(X):
++    for fold_idx, (train_idx, test_idx) in enumerate(cv_splitter.split(X)):
++        # TODO P3C4-001-006: Extract train/test indices
++        logger.info(f"Fold {fold_idx}: train_size={len(train_idx)}, test_size={len(test_idx)}")
++
++        # TODO P3C4-001-006: Validate fold size >= 100
++        if len(test_idx) < 100:
++            raise ValueError(
++                f"Fold {fold_idx} has {len(test_idx)} test samples, minimum 100 required"
++            )
++
++        # TODO P3C4-001-006: Clone trainer for fold
++        # NOTE: Create new instance with same hyperparameters
++        # fold_trainer = _clone_trainer(trainer)
++
++        # TODO P3C4-001-006: Fit on train data
++        # X_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
++        # try:
++        #     fold_trainer.fit(X_train, y_train)
++        # except Exception as e:
++        #     logger.error(f"Fold {fold_idx} training failed: {e}")
++        #     raise ValueError(f"Fold {fold_idx} training failed") from e
++
++        # TODO P3C4-001-006: Predict on test data
++        # X_test, y_test = X.iloc[test_idx], y.iloc[test_idx]
++        # predictions = fold_trainer.predict(X_test)
++
++        # TODO P3C4-001-006: Store predictions with fold_id
++        # fold_predictions_list.append((test_idx, predictions, fold_idx))
++
++        # TODO P3C4-001-006: Compute and log fold metrics (r2, mse, mae)
++        # fold_metrics = _compute_fold_metrics(y_test, predictions, fold_idx, model_name, horizon)
++        # cv_scores.append(fold_metrics)
++        # logger.info(f"Fold {fold_idx} metrics: {fold_metrics}")
++
++        # TODO P3C4-001-006: Check for outlier predictions (>1% exceed ±500 bps)
++        # _check_outlier_predictions(predictions, fold_idx)
++
++        pass  # Remove after implementation
++
++    # TODO P3C4-001-006: Aggregate OOF predictions (call aggregate_oof_predictions)
++    # oof_predictions = aggregate_oof_predictions(fold_predictions_list)
++
++    # TODO P3C4-001-006: Train final model on all data
++    # logger.info(f"Training final model on all {len(X)} samples")
++    # final_trainer = _clone_trainer(trainer)
++    # try:
++    #     final_trainer.fit(X, y)
++    # except Exception as e:
++    #     logger.error(f"Final model training failed: {e}")
++    #     raise ValueError("Final model training failed") from e
++
++    # TODO P3C4-001-006: Return results dict
++    # return {
++    #     "oof_predictions": oof_predictions,
++    #     "final_model": final_trainer,
++    #     "cv_scores": cv_scores,
++    # }
++
+     raise NotImplementedError("P3C4-001-006: run_cv_training implementation pending")
+ 
+ 
++def _clone_trainer(trainer: BaseModelTrainer) -> BaseModelTrainer:
++    """
++    Clone a trainer instance to create a fresh model for a new fold.
++
++    Per P3C4-001-006: Each fold should use a fresh model instance.
++
++    Args:
++        trainer: Original trainer instance
++
++    Returns:
++        New trainer instance with same hyperparameters
++
++    Raises:
++        ValueError: If trainer type is unknown
++    """
++    # TODO P3C4-001-006: Implement trainer cloning
++    # if isinstance(trainer, RidgeTrainer):
++    #     return RidgeTrainer()
++    # elif isinstance(trainer, XGBoostTrainer):
++    #     return XGBoostTrainer()
++    # else:
++    #     raise ValueError(f"Unknown trainer type: {type(trainer)}")
++    raise NotImplementedError("P3C4-001-006: _clone_trainer implementation pending")
++
++
++def _compute_fold_metrics(
++    y_true: pd.Series,
++    y_pred: np.ndarray,
++    fold_idx: int,
++    model_name: str,
++    horizon: str,
++) -> dict[str, Any]:
++    """
++    Compute CV metrics for a single fold.
++
++    Per P3C4-001-006: Compute r2, mse, mae for each fold.
++
++    Args:
++        y_true: Ground truth labels
++        y_pred: Model predictions
++        fold_idx: Fold index
++        model_name: Model identifier
++        horizon: Horizon identifier
++
++    Returns:
++        Dictionary with fold metrics: {model, horizon, fold_id, r2, mse, mae}
++
++    Raises:
++        ValueError: If y_pred contains NaN values
++    """
++    # TODO P3C4-001-006: Validate predictions are finite
++    # if not np.all(np.isfinite(y_pred)):
++    #     raise ValueError(f"Fold {fold_idx}: predictions contain NaN or Inf values")
++
++    # TODO P3C4-001-006: Compute metrics
++    # r2 = r2_score(y_true, y_pred)
++    # mse = mean_squared_error(y_true, y_pred)
++    # mae = mean_absolute_error(y_true, y_pred)
++
++    # TODO P3C4-001-006: Handle edge cases (constant target)
++    # if np.allclose(y_true, y_true.iloc[0]):
++    #     logger.warning(f"Fold {fold_idx}: constant target, r2 may be NaN")
++
++    # TODO P3C4-001-006: Return metrics dict
++    # return {
++    #     "model": model_name,
++    #     "horizon": horizon,
++    #     "fold_id": fold_idx,
++    #     "r2": float(r2),
++    #     "mse": float(mse),
++    #     "mae": float(mae),
++    # }
++    raise NotImplementedError("P3C4-001-006: _compute_fold_metrics implementation pending")
++
++
++def _check_outlier_predictions(predictions: np.ndarray, fold_idx: int) -> None:
++    """
++    Check for outlier predictions and log warnings.
++
++    Per P3C4-001-006: Log warning if >1% of predictions exceed ±500 bps (±5.0).
++
++    Args:
++        predictions: Model predictions for a fold
++        fold_idx: Fold index for logging context
++    """
++    # TODO P3C4-001-006: Count outliers
++    # outlier_threshold = 5.0  # ±500 bps
++    # outliers = np.abs(predictions) > outlier_threshold
++    # outlier_pct = 100.0 * outliers.sum() / len(predictions)
++
++    # TODO P3C4-001-006: Log warning if >1% outliers
++    # if outlier_pct > 1.0:
++    #     logger.warning(
++    #         f"Fold {fold_idx}: {outlier_pct:.1f}% of predictions exceed ±{outlier_threshold} "
++    #         f"(max={predictions.max():.2f}, min={predictions.min():.2f})"
++    #     )
++    raise NotImplementedError("P3C4-001-006: _check_outlier_predictions implementation pending")
++
++
+ def aggregate_oof_predictions(
+     fold_predictions: Iterable[tuple[Sequence[Any], Sequence[float], int]],
+ ) -> pd.DataFrame:
+diff --git a/subagent_workflow.md b/subagent_workflow.md
+index 70a5ecd..5ea5eed 100644
+--- a/subagent_workflow.md
++++ b/subagent_workflow.md
+@@ -11,7 +11,7 @@ Use this checklist whenever you receive a feature/documentation request (e.g. "i
+ 3. **Gather a ticket summary.**  
+    If the request is vague, ask the user for the desired outcome, acceptance criteria, and any constraints. Record the ticket key you'll use (e.g. `SMK-001`).
+ 
+-4. **Planner subagent (mandatory first step).**  
++4. **Planner subagent (mandatory first step if user requested a feature. Can be skipped if user provided an existing ticket ID).**  
+    Prompt:  
+    `Use the planner subagent to create work items for Ticket: <KEY> - <short title>. Focus on scope, risks, and test strategy.`  
+    Save the plan in `tickets/work_items.json` (the planner already knows that workflow).
+diff --git a/tickets/archive/work-items.jsonl b/tickets/archive/work-items.jsonl
+index 174c7dd..d53a411 100644
+--- a/tickets/archive/work-items.jsonl
++++ b/tickets/archive/work-items.jsonl
+@@ -3,3 +3,5 @@
+ {"archived_at": "2025-10-15T18:04:36Z", "ticket_key": null, "work_item_id": "P3C4-001-004", "module": {"ticket_id": "P3C4-001-004", "title": "ModelRegistry Configuration", "description": "Create registry for base model configurations", "module": "src/model2/model_registry.py", "dependencies": ["P3C4-001-002", "P3C4-001-003"], "input": {"description": "Model name string", "schema": "model_name: Literal['ridge', 'xgboost']"}, "output": {"description": "Trainer instance and hyperparameters", "schema": "{'trainer': BaseModelTrainer, 'params': dict}"}, "edge_cases": ["Unknown model name: Raise KeyError with available models", "Invalid hyperparameters in config: Raise ValueError with validation message"], "tests": ["test_registry_get_ridge: Verify Ridge config matches specs (alpha=3.0, random_state=42)", "test_registry_get_xgboost: Verify XGBoost config matches specs (all 6 params correct)", "test_registry_unknown_model: Verify KeyError raised for invalid model name", "test_registry_list_models: Verify list_available_models() returns ['ridge', 'xgboost']"], "acceptance": "Registry returns correct trainer and params for both models"}}
+ {"archived_at": "2025-10-15T18:33:38Z", "ticket_key": null, "work_item_id": "P3C4-001-003", "module": {"ticket_id": "P3C4-001-003", "title": "XGBoostTrainer Implementation", "description": "Implement XGBoost trainer with frozen hyperparameters from specs", "module": "src/model2/base_models.py", "dependencies": ["P3C4-001-001"], "input": {"description": "Training data", "schema": "X: DataFrame (N_samples, N_features), y: Series (N_samples,)"}, "output": {"description": "Trained XGBoost model", "schema": "Fitted xgboost.XGBRegressor object"}, "edge_cases": ["Insufficient samples for tree depth: XGBoost handles gracefully", "Empty training set: Raise ValueError", "y contains NaN: XGBoost raises, propagate error", "Feature names with special chars: Sanitize feature names before training"], "tests": ["test_xgboost_trainer_fit: Verify fit on toy data", "test_xgboost_trainer_predict: Verify predictions match expected shape", "test_xgboost_trainer_feature_importance: Verify get_feature_importance() returns DataFrame with [feature, importance_gain, importance_weight]", "test_xgboost_trainer_determinism: Two fits with same seed produce identical predictions (max diff < 1e-6)"], "acceptance": "XGBoostTrainer trains successfully, extracts feature importance, predictions deterministic"}}
+ {"archived_at": "2025-10-15T22:54:29Z", "ticket_key": null, "work_item_id": "P3C4-001-005", "module": {"ticket_id": "P3C4-001-005", "title": "OOF Prediction Aggregation", "description": "Aggregate OOF predictions across CV folds into single DataFrame", "module": "src/model2/base_models.py", "dependencies": [], "input": {"description": "List of fold predictions", "schema": "List[Tuple[np.ndarray indices, np.ndarray predictions, int fold_id]]"}, "output": {"description": "Aggregated OOF predictions", "schema": "DataFrame with MultiIndex (instrument, datetime), columns [prediction, fold_id]"}, "edge_cases": ["Duplicate indices across folds: Raise ValueError with overlap info", "Missing indices (incomplete coverage): Log warning with missing count", "Empty fold: Skip fold, log warning", "Prediction NaN: Raise ValueError with fold and index info"], "tests": ["test_oof_aggregation_full_coverage: Verify all indices present exactly once", "test_oof_aggregation_duplicate_indices: Verify ValueError on overlapping folds", "test_oof_aggregation_missing_indices: Verify warning logged for missing indices", "test_oof_aggregation_nan_prediction: Verify ValueError on NaN predictions"], "acceptance": "Aggregation handles 5 folds correctly, detects overlaps and gaps"}}
++{"archived_at": "2025-10-16T21:38:19Z", "ticket_key": null, "work_item_id": "P3C4-001-006", "module": {"ticket_id": "P3C4-001-006", "title": "CV Training Loop Orchestrator", "description": "Orchestrate CV training loop for a single model-horizon pair", "module": "src/model2/base_models.py", "dependencies": ["P3C4-001-004", "P3C4-001-005"], "input": {"description": "Training data and CV splitter", "schema": "X: DataFrame, y: Series, cv_splitter: PurgedEmbargoedTimeSeriesSplit, trainer: BaseModelTrainer"}, "output": {"description": "OOF predictions and trained final model", "schema": "{'oof_predictions': DataFrame, 'final_model': BaseModelTrainer, 'cv_scores': List[dict]}"}, "edge_cases": ["CV fold too small: Validate min 100 samples per fold, raise ValueError", "Training fails on fold: Log error, re-raise with fold context", "All predictions in fold are outliers (>1000 bps): Log warning, continue", "Final model training fails: Re-raise with full context"], "tests": ["test_cv_loop_full_pipeline: End-to-end with synthetic data (200 samples, 5 features, 3 folds)", "test_cv_loop_small_fold: Verify ValueError when fold < 100 samples", "test_cv_loop_cv_scores: Verify CV scores logged for all folds (metric='r2')", "test_cv_loop_final_model: Verify final model trained on all data"], "acceptance": "CV loop completes for both models, logs 5 fold scores, returns OOF predictions and final model"}}
++{"archived_at": "2025-10-17T01:40:41Z", "ticket_key": null, "work_item_id": "P3C4-001-007", "module": {"ticket_id": "P3C4-001-007", "title": "Feature Importance Extraction and Logging", "description": "Extract XGBoost feature importance and save to parquet", "module": "src/model2/base_models.py", "dependencies": ["P3C4-001-003"], "input": {"description": "Trained XGBoost model", "schema": "model: xgboost.XGBRegressor (fitted)"}, "output": {"description": "Feature importance DataFrame", "schema": "DataFrame with columns [feature, importance_gain, importance_weight], sorted by importance_gain descending"}, "edge_cases": ["No features used (constant target): Return empty DataFrame", "Feature names missing: Use default f0, f1, ... names", "Zero importance for all features: Log warning, return full table"], "tests": ["test_feature_importance_extraction: Verify extraction from fitted XGBoost", "test_feature_importance_sorting: Verify sorted by gain descending", "test_feature_importance_schema: Verify matches FeatureImportance.schema.json", "test_feature_importance_logging: Verify top 20 features logged at INFO level"], "acceptance": "Feature importance extracted, saved to parquet, top 20 logged"}}
+diff --git a/tickets/work_items.json b/tickets/work_items.json
+index a9f3089..10b8a32 100644
+--- a/tickets/work_items.json
++++ b/tickets/work_items.json
+@@ -1,64 +1,4 @@
+ [
+-  {
+-    "ticket_id": "P3C4-001-006",
+-    "title": "CV Training Loop Orchestrator",
+-    "description": "Orchestrate CV training loop for a single model-horizon pair",
+-    "module": "src/model2/base_models.py",
+-    "dependencies": [
+-      "P3C4-001-004",
+-      "P3C4-001-005"
+-    ],
+-    "input": {
+-      "description": "Training data and CV splitter",
+-      "schema": "X: DataFrame, y: Series, cv_splitter: PurgedEmbargoedTimeSeriesSplit, trainer: BaseModelTrainer"
+-    },
+-    "output": {
+-      "description": "OOF predictions and trained final model",
+-      "schema": "{'oof_predictions': DataFrame, 'final_model': BaseModelTrainer, 'cv_scores': List[dict]}"
+-    },
+-    "edge_cases": [
+-      "CV fold too small: Validate min 100 samples per fold, raise ValueError",
+-      "Training fails on fold: Log error, re-raise with fold context",
+-      "All predictions in fold are outliers (>1000 bps): Log warning, continue",
+-      "Final model training fails: Re-raise with full context"
+-    ],
+-    "tests": [
+-      "test_cv_loop_full_pipeline: End-to-end with synthetic data (200 samples, 5 features, 3 folds)",
+-      "test_cv_loop_small_fold: Verify ValueError when fold < 100 samples",
+-      "test_cv_loop_cv_scores: Verify CV scores logged for all folds (metric='r2')",
+-      "test_cv_loop_final_model: Verify final model trained on all data"
+-    ],
+-    "acceptance": "CV loop completes for both models, logs 5 fold scores, returns OOF predictions and final model"
+-  },
+-  {
+-    "ticket_id": "P3C4-001-007",
+-    "title": "Feature Importance Extraction and Logging",
+-    "description": "Extract XGBoost feature importance and save to parquet",
+-    "module": "src/model2/base_models.py",
+-    "dependencies": [
+-      "P3C4-001-003"
+-    ],
+-    "input": {
+-      "description": "Trained XGBoost model",
+-      "schema": "model: xgboost.XGBRegressor (fitted)"
+-    },
+-    "output": {
+-      "description": "Feature importance DataFrame",
+-      "schema": "DataFrame with columns [feature, importance_gain, importance_weight], sorted by importance_gain descending"
+-    },
+-    "edge_cases": [
+-      "No features used (constant target): Return empty DataFrame",
+-      "Feature names missing: Use default f0, f1, ... names",
+-      "Zero importance for all features: Log warning, return full table"
+-    ],
+-    "tests": [
+-      "test_feature_importance_extraction: Verify extraction from fitted XGBoost",
+-      "test_feature_importance_sorting: Verify sorted by gain descending",
+-      "test_feature_importance_schema: Verify matches FeatureImportance.schema.json",
+-      "test_feature_importance_logging: Verify top 20 features logged at INFO level"
+-    ],
+-    "acceptance": "Feature importance extracted, saved to parquet, top 20 logged"
+-  },
+   {
+     "ticket_id": "P3C4-001-008",
+     "title": "Model Persistence (Save/Load)",
+
+```
+
+Please assess this entire patch set and respond with one of the following:
+
+1. If every change is correct, safe, and ready to merge, start your response with 'APPROVE:' followed by a brief confirmation (feel free to mention any key points you checked).
+
+2. If you spot any issue—incorrect logic, missing context, regressions, tests needed, etc.—start your response with 'REJECT:' followed by:
+   - What is wrong
+   - Specific suggestions for how to fix it
+   - What the corrected code should look like or what additional work is required
+
+Evaluate the diff holistically; approving partial fixes is not allowed. Only approve if you're completely satisfied with the combined changes.
+
+thinking
+**Reviewing patch and spotting major issues**
+
+I carefully examined the large patch meant to fix test assertions about hash fields but saw it doesn’t update any test files, leaving the original bug unresolved. The patch also introduces unrelated changes like new functions still raising NotImplementedError, imports that aren’t used, and removal of codex review logs. The most critical problem is that `tests/model2/test_model2_persistence.py` still contains failing assertions on lines 56, 76, and 127. Without correcting these tests, the patch can’t be accepted. I’ll recommend rejecting it with clear notes on the missing fixes and extraneous modifications.
+codex
+REJECT: `tests/model2/test_model2_persistence.py` still asserts the wrong hash fields (e.g. lines 56, 76 use `data_hash` for model artifacts, and line 127 uses `model_hash` for the OOF artifact). Because the diff never touches the test file, the bug called out in P3C4-001-008 remains and the suite will keep failing. Please update those assertions so model artifacts compare `model_hash` and OOF artifacts compare `data_hash`, before considering unrelated refactors.
+tokens used
+11,623

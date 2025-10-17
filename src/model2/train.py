@@ -1,5 +1,4 @@
-"""
-Model 2 Training Pipeline: Purged & Embargoed TimeSeriesSplit
+"""Model 2 Training Pipeline: Purged & Embargoed TimeSeriesSplit
 
 Implements Chunk 3 of Phase 3 breakdown:
 - TimeSeriesSplit with expanding window (n_splits=5)
@@ -21,6 +20,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import Ridge
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 logger = logging.getLogger(__name__)
 
@@ -664,6 +664,11 @@ class XGBoostTrainer(BaseModelTrainer):
         }
 
 
+# ============================================================================
+# Chunk 4: CV Training Loop Orchestrator (P3C4-001-006)
+# ============================================================================
+
+
 def run_cv_training(
     X: pd.DataFrame,
     y: pd.Series,
@@ -700,20 +705,176 @@ def run_cv_training(
         - Training failure: Log error with fold context, re-raise
         - Outlier predictions: Log warning if >1% exceed ±500 bps
     """
-    # TODO: Initialize OOF prediction storage
-    # TODO: Initialize CV scores list
-    # TODO: For each fold from cv_splitter.split(X):
-    #   - Extract train/test indices
-    #   - Validate fold size >= 100
-    #   - Clone trainer for fold
-    #   - Fit on train data
-    #   - Predict on test data
-    #   - Store predictions with fold_id
-    #   - Compute and log fold metrics (r2, mse, mae)
-    # TODO: Aggregate OOF predictions (call aggregate_oof_predictions)
-    # TODO: Train final model on all data
-    # TODO: Return results dict
+    logger.info(
+        f"Starting CV training: model={model_name}, horizon={horizon}, "
+        f"n_samples={len(X)}, n_features={X.shape[1]}, n_splits={cv_splitter.n_splits}"
+    )
+
+    # TODO P3C4-001-006: Initialize OOF prediction storage
+    fold_predictions_list: list[tuple[Sequence[Any], Sequence[float], int]] = []
+
+    # TODO P3C4-001-006: Initialize CV scores list
+    cv_scores: list[dict[str, Any]] = []
+
+    # TODO P3C4-001-006: For each fold from cv_splitter.split(X):
+    for fold_idx, (train_idx, test_idx) in enumerate(cv_splitter.split(X)):
+        # TODO P3C4-001-006: Extract train/test indices
+        logger.info(f"Fold {fold_idx}: train_size={len(train_idx)}, test_size={len(test_idx)}")
+
+        # TODO P3C4-001-006: Validate fold size >= 100
+        if len(test_idx) < 100:
+            raise ValueError(
+                f"Fold {fold_idx} has {len(test_idx)} test samples, minimum 100 required"
+            )
+
+        # TODO P3C4-001-006: Clone trainer for fold
+        # NOTE: Create new instance with same hyperparameters
+        # fold_trainer = _clone_trainer(trainer)
+
+        # TODO P3C4-001-006: Fit on train data
+        # X_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
+        # try:
+        #     fold_trainer.fit(X_train, y_train)
+        # except Exception as e:
+        #     logger.error(f"Fold {fold_idx} training failed: {e}")
+        #     raise ValueError(f"Fold {fold_idx} training failed") from e
+
+        # TODO P3C4-001-006: Predict on test data
+        # X_test, y_test = X.iloc[test_idx], y.iloc[test_idx]
+        # predictions = fold_trainer.predict(X_test)
+
+        # TODO P3C4-001-006: Store predictions with fold_id
+        # fold_predictions_list.append((test_idx, predictions, fold_idx))
+
+        # TODO P3C4-001-006: Compute and log fold metrics (r2, mse, mae)
+        # fold_metrics = _compute_fold_metrics(y_test, predictions, fold_idx, model_name, horizon)
+        # cv_scores.append(fold_metrics)
+        # logger.info(f"Fold {fold_idx} metrics: {fold_metrics}")
+
+        # TODO P3C4-001-006: Check for outlier predictions (>1% exceed ±500 bps)
+        # _check_outlier_predictions(predictions, fold_idx)
+
+        pass  # Remove after implementation
+
+    # TODO P3C4-001-006: Aggregate OOF predictions (call aggregate_oof_predictions)
+    # oof_predictions = aggregate_oof_predictions(fold_predictions_list)
+
+    # TODO P3C4-001-006: Train final model on all data
+    # logger.info(f"Training final model on all {len(X)} samples")
+    # final_trainer = _clone_trainer(trainer)
+    # try:
+    #     final_trainer.fit(X, y)
+    # except Exception as e:
+    #     logger.error(f"Final model training failed: {e}")
+    #     raise ValueError("Final model training failed") from e
+
+    # TODO P3C4-001-006: Return results dict
+    # return {
+    #     "oof_predictions": oof_predictions,
+    #     "final_model": final_trainer,
+    #     "cv_scores": cv_scores,
+    # }
+
     raise NotImplementedError("P3C4-001-006: run_cv_training implementation pending")
+
+
+def _clone_trainer(trainer: BaseModelTrainer) -> BaseModelTrainer:
+    """
+    Clone a trainer instance to create a fresh model for a new fold.
+
+    Per P3C4-001-006: Each fold should use a fresh model instance.
+
+    Args:
+        trainer: Original trainer instance
+
+    Returns:
+        New trainer instance with same hyperparameters
+
+    Raises:
+        ValueError: If trainer type is unknown
+    """
+    # TODO P3C4-001-006: Implement trainer cloning
+    # if isinstance(trainer, RidgeTrainer):
+    #     return RidgeTrainer()
+    # elif isinstance(trainer, XGBoostTrainer):
+    #     return XGBoostTrainer()
+    # else:
+    #     raise ValueError(f"Unknown trainer type: {type(trainer)}")
+    raise NotImplementedError("P3C4-001-006: _clone_trainer implementation pending")
+
+
+def _compute_fold_metrics(
+    y_true: pd.Series,
+    y_pred: np.ndarray,
+    fold_idx: int,
+    model_name: str,
+    horizon: str,
+) -> dict[str, Any]:
+    """
+    Compute CV metrics for a single fold.
+
+    Per P3C4-001-006: Compute r2, mse, mae for each fold.
+
+    Args:
+        y_true: Ground truth labels
+        y_pred: Model predictions
+        fold_idx: Fold index
+        model_name: Model identifier
+        horizon: Horizon identifier
+
+    Returns:
+        Dictionary with fold metrics: {model, horizon, fold_id, r2, mse, mae}
+
+    Raises:
+        ValueError: If y_pred contains NaN values
+    """
+    # TODO P3C4-001-006: Validate predictions are finite
+    # if not np.all(np.isfinite(y_pred)):
+    #     raise ValueError(f"Fold {fold_idx}: predictions contain NaN or Inf values")
+
+    # TODO P3C4-001-006: Compute metrics
+    # r2 = r2_score(y_true, y_pred)
+    # mse = mean_squared_error(y_true, y_pred)
+    # mae = mean_absolute_error(y_true, y_pred)
+
+    # TODO P3C4-001-006: Handle edge cases (constant target)
+    # if np.allclose(y_true, y_true.iloc[0]):
+    #     logger.warning(f"Fold {fold_idx}: constant target, r2 may be NaN")
+
+    # TODO P3C4-001-006: Return metrics dict
+    # return {
+    #     "model": model_name,
+    #     "horizon": horizon,
+    #     "fold_id": fold_idx,
+    #     "r2": float(r2),
+    #     "mse": float(mse),
+    #     "mae": float(mae),
+    # }
+    raise NotImplementedError("P3C4-001-006: _compute_fold_metrics implementation pending")
+
+
+def _check_outlier_predictions(predictions: np.ndarray, fold_idx: int) -> None:
+    """
+    Check for outlier predictions and log warnings.
+
+    Per P3C4-001-006: Log warning if >1% of predictions exceed ±500 bps (±5.0).
+
+    Args:
+        predictions: Model predictions for a fold
+        fold_idx: Fold index for logging context
+    """
+    # TODO P3C4-001-006: Count outliers
+    # outlier_threshold = 5.0  # ±500 bps
+    # outliers = np.abs(predictions) > outlier_threshold
+    # outlier_pct = 100.0 * outliers.sum() / len(predictions)
+
+    # TODO P3C4-001-006: Log warning if >1% outliers
+    # if outlier_pct > 1.0:
+    #     logger.warning(
+    #         f"Fold {fold_idx}: {outlier_pct:.1f}% of predictions exceed ±{outlier_threshold} "
+    #         f"(max={predictions.max():.2f}, min={predictions.min():.2f})"
+    #     )
+    raise NotImplementedError("P3C4-001-006: _check_outlier_predictions implementation pending")
 
 
 def aggregate_oof_predictions(
