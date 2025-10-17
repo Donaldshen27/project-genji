@@ -102,3 +102,7 @@ Thumbs.db
 *.temp
 tmp/
 temp/
+
+# Codex temporary directories
+.codex/
+.codex_workdir/
