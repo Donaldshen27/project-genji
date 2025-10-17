@@ -23,9 +23,11 @@ Use this checklist whenever you receive a feature/documentation request (e.g. "i
 
 6. **Implementer subagent (only after planner + skeletoner).**  
    Prompt:  
-   `Use the implementer subagent to implement Ticket: <KEY> - <short title>. Produce a JSON package in patches/ with description/context summarising what you are changing and why, plus any tests.`  
+   `Ticket: <KEY>`  
+   `Implementer: Fix <short title>. Produce a JSON package in patches/<slug>.json using repository-relative paths (no /home/... prefixes). Include description/context summarising the change and any tests.`  
    Requirements for each package:
    - Include `description` (and optionally `context`, `notes`, `summary`) so the Codex reviewer sees the rationale.
+   - Reference files using repository-relative paths (for example `patches/<ticket>.json` rather than absolute filesystem paths).
    - Add or update tests covering the change where possible.
    - Emit full-file snapshots (`files`/`tests` arrays) instead of hand-written diffs. Never edit repository files directly.
 
