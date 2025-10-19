@@ -759,3 +759,152 @@ def aggregate_oof_predictions(
     aggregated = pd.concat(frames).sort_index()
     aggregated = aggregated[["prediction", "fold_id"]]
     return aggregated
+
+
+# ============================================================================
+# Multi-Horizon Training Wrapper (P3C4-001-009)
+# ============================================================================
+
+
+def train_multi_horizon(
+    features: pd.DataFrame,
+    labels: pd.DataFrame,
+    cv_splitter: Any,
+    config: dict[str, Any],
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """Train all base models for both 21d and 63d horizons.
+
+    Per P3C4-001-009: Orchestrate training across all model-horizon pairs,
+    handling edge cases (missing labels, index mismatches, partial failures).
+
+    Args:
+        features: Feature matrix with MultiIndex (instrument, datetime)
+        labels: Labels DataFrame with columns [label_21d, label_63d]
+        cv_splitter: CPCV splitter instance
+        config: Configuration dict with keys [models, horizons, ...]
+
+    Returns:
+        Dict mapping (model_name, horizon) -> {
+            'oof': DataFrame,
+            'model': BaseModelTrainer,
+            'cv_scores': List[dict]
+        }
+
+    Raises:
+        KeyError: If required label columns are missing
+        ValueError: If feature-label index mismatch or all models fail
+        RuntimeError: If all model-horizon pairs fail training
+
+    Edge cases:
+        - Label column missing: Raise KeyError with expected columns
+        - Feature-label index mismatch: Inner join, log dropped count
+        - Horizon fails mid-training: Log error, continue with other horizons
+        - All models fail: Raise RuntimeError with summary
+
+    Example:
+        >>> results = train_multi_horizon(features, labels, cv_splitter, config)
+        >>> ridge_21d_oof = results[('ridge', '21d')]['oof']
+        >>> xgb_63d_model = results[('xgboost', '63d')]['model']
+    """
+    # TODO P3C4-001-009: Validate label columns exist
+    # Expected columns: ['label_21d', 'label_63d']
+    # Raise KeyError if missing: "Missing required label columns: {missing}"
+
+    # TODO P3C4-001-009: Validate features and labels have compatible indices
+    # Use inner join to align features and labels
+    # Log warning if any rows are dropped: "Dropped {n} rows due to index mismatch"
+
+    # TODO P3C4-001-009: Extract model names from config['models']
+    # Expected format: config['models'] = ['ridge', 'xgboost']
+    # Default to ['ridge', 'xgboost'] if not present
+
+    # TODO P3C4-001-009: Extract horizons from config or labels
+    # Default to ['21d', '63d'] based on label column naming
+
+    # TODO P3C4-001-009: Iterate over all (model_name, horizon) pairs
+    # For each pair:
+    #   1. Get trainer instance from model_registry.get_model(model_name)
+    #   2. Extract label series for horizon: y = labels[f'label_{horizon}']
+    #   3. Call run_cv_training(features, y, cv_splitter, trainer, model_name, horizon)
+    #   4. Store result in results dict: results[(model_name, horizon)] = cv_result
+    #   5. Handle exceptions: log error, continue if config allows partial failures
+
+    # TODO P3C4-001-009: After all training, validate at least one pair succeeded
+    # If all pairs failed, raise RuntimeError with summary of failures
+
+    # TODO P3C4-001-009: Log summary of successful/failed pairs
+    # Format: "Multi-horizon training complete: {n_success}/{n_total} pairs successful"
+
+    raise NotImplementedError(
+        "P3C4-001-009: train_multi_horizon stub - implementation required"
+    )
+
+
+def save_multi_horizon_results(
+    results: dict[tuple[str, str], dict[str, Any]],
+    output_dir: Path,
+    region: str,
+) -> None:
+    """Save all multi-horizon training outputs to disk.
+
+    Per P3C4-001-009: Persist OOF predictions, models, CV scores, and feature
+    importance for all model-horizon pairs.
+
+    Args:
+        results: Output from train_multi_horizon()
+        output_dir: Base directory for outputs (e.g., data/model2/us/)
+        region: Region identifier ("US" or "CN")
+
+    Raises:
+        OSError: If any file write operations fail
+        ValueError: If results dict is empty
+
+    Edge cases:
+        - Empty results: Raise ValueError
+        - Output directory doesn't exist: Create with parents
+        - Partial save failure: Log error, continue with remaining outputs
+
+    Output structure:
+        {output_dir}/
+            oof/
+                ridge_21d_oof.parquet
+                ridge_63d_oof.parquet
+                xgboost_21d_oof.parquet
+                xgboost_63d_oof.parquet
+            models/
+                ridge_21d.pkl
+                ridge_63d.pkl
+                xgboost_21d.pkl
+                xgboost_63d.pkl
+            cv_scores/
+                ridge_21d_cv_scores.json
+                ridge_63d_cv_scores.json
+                xgboost_21d_cv_scores.json
+                xgboost_63d_cv_scores.json
+            feature_importance/
+                xgboost_21d_importance.parquet
+                xgboost_63d_importance.parquet
+    """
+    # TODO P3C4-001-009: Validate results dict is not empty
+    # Raise ValueError if empty: "Cannot save empty results"
+
+    # TODO P3C4-001-009: Create output subdirectories
+    # Subdirs: oof/, models/, cv_scores/, feature_importance/
+
+    # TODO P3C4-001-009: Iterate over all (model_name, horizon) pairs
+    # For each pair:
+    #   1. Save OOF predictions using persistence.save_oof_predictions()
+    #      Path: {output_dir}/oof/{model_name}_{horizon}_oof.parquet
+    #   2. Save final model using persistence.save_trained_model()
+    #      Path: {output_dir}/models/{model_name}_{horizon}.pkl
+    #   3. Save CV scores to JSON
+    #      Path: {output_dir}/cv_scores/{model_name}_{horizon}_cv_scores.json
+    #   4. If model has feature importance (XGBoost), save using save_feature_importance()
+    #      Path: {output_dir}/feature_importance/{model_name}_{horizon}_importance.parquet
+
+    # TODO P3C4-001-009: Log summary of saved files
+    # Format: "Saved outputs for {n} model-horizon pairs to {output_dir}"
+
+    raise NotImplementedError(
+        "P3C4-001-009: save_multi_horizon_results stub - implementation required"
+    )
