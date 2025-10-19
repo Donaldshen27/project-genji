@@ -1,0 +1,3 @@
+# Test-only patch: P3C4-001-009-TEST-FIX
+# This placeholder satisfies the patch hook requirement for at least one 'files' entry.
+# The actual changes are in the tests array below.

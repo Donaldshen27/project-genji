@@ -438,9 +438,7 @@ def test_feature_importance_sorting():
     np.random.seed(42)
     X = pd.DataFrame(np.random.randn(100, 10), columns=[f"f{i}" for i in range(10)])
     # Create target with varying feature contributions
-    y = pd.Series(
-        X["f0"] * 5.0 + X["f1"] * 3.0 + X["f5"] * 1.0 + np.random.randn(100) * 0.1
-    )
+    y = pd.Series(X["f0"] * 5.0 + X["f1"] * 3.0 + X["f5"] * 1.0 + np.random.randn(100) * 0.1)
 
     trainer = XGBoostTrainer()
     trainer.fit(X, y)

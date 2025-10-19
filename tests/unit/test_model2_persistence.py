@@ -24,9 +24,7 @@ from src.model2.persistence import (
 def _build_multiindex_oof_df() -> pd.DataFrame:
     instruments = ["AAPL", "GOOGL"]
     dates = pd.date_range("2024-01-01", periods=5, freq="D")
-    index = pd.MultiIndex.from_product(
-        [instruments, dates], names=["instrument", "datetime"]
-    )
+    index = pd.MultiIndex.from_product([instruments, dates], names=["instrument", "datetime"])
     predictions = np.linspace(-0.5, 0.5, len(index))
     folds = np.tile(np.arange(5, dtype=np.int8), len(instruments))
     df = pd.DataFrame({"prediction": predictions, "fold_id": folds}, index=index)
@@ -76,7 +74,9 @@ def test_save_and_load_xgboost_model_round_trip(tmp_path: Path) -> None:
     assert loaded_metadata.class_path.endswith("XGBoostTrainer")
 
 
-def test_save_model_creates_parent_dir_and_warns(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_save_model_creates_parent_dir_and_warns(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     X = pd.DataFrame(np.random.randn(32, 4), columns=[f"c{i}" for i in range(4)])
     y = pd.Series(np.random.randn(32))
     trainer = RidgeTrainer().fit(X, y)
@@ -123,7 +123,9 @@ def test_save_and_load_oof_predictions_multiindex(tmp_path: Path) -> None:
 
     loaded_df, loaded_metadata = load_oof_predictions(parquet_path)
 
-    pd.testing.assert_frame_equal(loaded_df, oof_df.astype({"prediction": np.float32, "fold_id": np.int8}))
+    pd.testing.assert_frame_equal(
+        loaded_df, oof_df.astype({"prediction": np.float32, "fold_id": np.int8})
+    )
     assert saved_metadata.data_hash == loaded_metadata.data_hash
     assert loaded_df.index.names == ("instrument", "datetime")
     assert loaded_df["prediction"].dtype == np.float32
@@ -138,7 +140,9 @@ def test_save_oof_predictions_missing_columns(tmp_path: Path) -> None:
         save_oof_predictions(df, parquet_path)
 
 
-def test_save_oof_predictions_warns_on_overwrite(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_save_oof_predictions_warns_on_overwrite(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     df = _build_multiindex_oof_df()
     parquet_path = tmp_path / "oof.parquet"
     save_oof_predictions(df, parquet_path)
@@ -168,7 +172,10 @@ def test_load_oof_predictions_hash_mismatch(tmp_path: Path) -> None:
 
 def test_save_and_load_empty_oof_predictions(tmp_path: Path) -> None:
     index = pd.MultiIndex.from_arrays([[], []], names=["instrument", "datetime"])
-    df = pd.DataFrame({"prediction": pd.Series(dtype=np.float32), "fold_id": pd.Series(dtype=np.int8)}, index=index)
+    df = pd.DataFrame(
+        {"prediction": pd.Series(dtype=np.float32), "fold_id": pd.Series(dtype=np.int8)},
+        index=index,
+    )
     parquet_path = tmp_path / "empty.parquet"
 
     save_oof_predictions(df, parquet_path)

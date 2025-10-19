@@ -36,9 +36,7 @@ def synthetic_cv_data():
 
     # Build MultiIndex with datetime FIRST to ensure monotonic ordering
     # This satisfies PurgedEmbargoedTimeSeriesSplit's requirement for sorted dates
-    index = pd.MultiIndex.from_product(
-        [dates, instruments], names=["datetime", "instrument"]
-    )
+    index = pd.MultiIndex.from_product([dates, instruments], names=["datetime", "instrument"])
 
     # Create features and target
     n_samples = len(index)
@@ -65,9 +63,7 @@ def small_fold_data():
     instruments = ["AAPL", "MSFT", "GOOGL"]
 
     # Index sorted by datetime first
-    index = pd.MultiIndex.from_product(
-        [dates, instruments], names=["datetime", "instrument"]
-    )
+    index = pd.MultiIndex.from_product([dates, instruments], names=["datetime", "instrument"])
 
     n_samples = len(index)
     X = pd.DataFrame(
@@ -300,9 +296,7 @@ def test_cv_loop_constant_target():
     # Create data with constant target (300 days for sufficient splits)
     dates = pd.date_range("2020-01-01", periods=300, freq="D")
     instruments = ["AAPL", "MSFT"]
-    index = pd.MultiIndex.from_product(
-        [dates, instruments], names=["datetime", "instrument"]
-    )
+    index = pd.MultiIndex.from_product([dates, instruments], names=["datetime", "instrument"])
 
     X = pd.DataFrame(
         np.random.randn(len(index), 5), index=index, columns=[f"f{i}" for i in range(5)]

@@ -221,7 +221,7 @@ def main() -> None:
 
     try:
         result = subprocess.run(
-            ["codex", "exec", prompt,"--yolo"],
+            ["codex", "exec", prompt, "--yolo"],
             capture_output=True,
             text=True,
             timeout=1490,  # Leave 10 seconds before the 1500s hook timeout

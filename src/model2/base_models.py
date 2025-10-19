@@ -7,6 +7,7 @@ This module is extracted from src/model2/train.py to separate
 base model implementations from the CPCV splitting logic.
 """
 
+import json
 import logging
 import math
 import re
@@ -560,9 +561,7 @@ def run_cv_training(
         fold_predictions_list.append((X_test.index, predictions, fold_idx))
 
         # Compute and log fold metrics
-        fold_metrics = _compute_fold_metrics(
-            y_test, predictions, fold_idx, model_name, horizon
-        )
+        fold_metrics = _compute_fold_metrics(y_test, predictions, fold_idx, model_name, horizon)
         cv_scores.append(fold_metrics)
         logger.info(
             f"Fold {fold_idx} metrics: r2={fold_metrics['r2']:.4f}, "
@@ -723,7 +722,11 @@ def aggregate_oof_predictions(
             )
 
         indices, predictions, fold_id = entry
-        index = pd.Index(indices)
+        # Preserve MultiIndex structure if present
+        if isinstance(indices, pd.MultiIndex):
+            index = indices
+        else:
+            index = pd.Index(indices)
         preds_array = np.asarray(predictions, dtype=np.float32)
 
         if preds_array.ndim != 1:
@@ -806,38 +809,140 @@ def train_multi_horizon(
         >>> ridge_21d_oof = results[('ridge', '21d')]['oof']
         >>> xgb_63d_model = results[('xgboost', '63d')]['model']
     """
-    # TODO P3C4-001-009: Validate label columns exist
-    # Expected columns: ['label_21d', 'label_63d']
-    # Raise KeyError if missing: "Missing required label columns: {missing}"
+    logger.info("Starting multi-horizon training orchestration")
 
-    # TODO P3C4-001-009: Validate features and labels have compatible indices
-    # Use inner join to align features and labels
-    # Log warning if any rows are dropped: "Dropped {n} rows due to index mismatch"
+    # Validate label columns exist
+    required_label_cols = {"label_21d", "label_63d"}
+    missing_labels = required_label_cols - set(labels.columns)
+    if missing_labels:
+        raise KeyError(
+            f"Missing required label columns: {sorted(missing_labels)}. "
+            f"Expected columns: {sorted(required_label_cols)}"
+        )
 
-    # TODO P3C4-001-009: Extract model names from config['models']
-    # Expected format: config['models'] = ['ridge', 'xgboost']
-    # Default to ['ridge', 'xgboost'] if not present
+    # Validate features and labels have compatible indices via inner join
+    original_feature_count = len(features)
+    original_label_count = len(labels)
 
-    # TODO P3C4-001-009: Extract horizons from config or labels
-    # Default to ['21d', '63d'] based on label column naming
+    # Perform inner join to align features and labels
+    aligned_features = features.join(labels[[]], how="inner")
+    aligned_labels = labels.loc[aligned_features.index]
 
-    # TODO P3C4-001-009: Iterate over all (model_name, horizon) pairs
-    # For each pair:
-    #   1. Get trainer instance from model_registry.get_model(model_name)
-    #   2. Extract label series for horizon: y = labels[f'label_{horizon}']
-    #   3. Call run_cv_training(features, y, cv_splitter, trainer, model_name, horizon)
-    #   4. Store result in results dict: results[(model_name, horizon)] = cv_result
-    #   5. Handle exceptions: log error, continue if config allows partial failures
+    dropped_rows = original_feature_count - len(aligned_features)
+    if dropped_rows > 0:
+        logger.warning(
+            f"Dropped {dropped_rows} rows due to feature-label index mismatch "
+            f"(features: {original_feature_count}, labels: {original_label_count}, "
+            f"aligned: {len(aligned_features)})"
+        )
 
-    # TODO P3C4-001-009: After all training, validate at least one pair succeeded
-    # If all pairs failed, raise RuntimeError with summary of failures
+    # Extract model names from config (default to ridge and xgboost)
+    model_names = config.get("models", ["ridge", "xgboost"])
+    if not isinstance(model_names, list) or not model_names:
+        model_names = ["ridge", "xgboost"]
+        logger.warning(f"Config 'models' key missing or invalid, using defaults: {model_names}")
 
-    # TODO P3C4-001-009: Log summary of successful/failed pairs
-    # Format: "Multi-horizon training complete: {n_success}/{n_total} pairs successful"
+    # Extract horizons from config or default to 21d and 63d
+    horizons = config.get("horizons", ["21d", "63d"])
+    if not isinstance(horizons, list) or not horizons:
+        horizons = ["21d", "63d"]
+        logger.warning(f"Config 'horizons' key missing or invalid, using defaults: {horizons}")
 
-    raise NotImplementedError(
-        "P3C4-001-009: train_multi_horizon stub - implementation required"
+    # Model registry: map string names to trainer classes
+    model_registry = {
+        "ridge": RidgeTrainer,
+        "xgboost": XGBoostTrainer,
+    }
+
+    # Results storage and failure tracking
+    results: dict[tuple[str, str], dict[str, Any]] = {}
+    failures: list[tuple[str, str, str]] = []  # (model_name, horizon, error_msg)
+
+    # Iterate over all (model_name, horizon) pairs
+    total_pairs = len(model_names) * len(horizons)
+    logger.info(
+        f"Training {total_pairs} model-horizon pairs: models={model_names}, horizons={horizons}"
     )
+
+    for model_name in model_names:
+        for horizon in horizons:
+            logger.info(f"Training pair: model={model_name}, horizon={horizon}")
+
+            try:
+                # Get trainer class from registry
+                if model_name not in model_registry:
+                    raise ValueError(
+                        f"Unknown model name '{model_name}'. "
+                        f"Available models: {list(model_registry.keys())}"
+                    )
+
+                trainer_class = model_registry[model_name]
+                trainer = trainer_class()
+
+                # Extract label series for this horizon
+                label_col = f"label_{horizon}"
+                if label_col not in aligned_labels.columns:
+                    raise KeyError(
+                        f"Label column '{label_col}' not found in labels DataFrame. "
+                        f"Available columns: {list(aligned_labels.columns)}"
+                    )
+
+                y = aligned_labels[label_col]
+
+                # Run CV training for this model-horizon pair
+                cv_result = run_cv_training(
+                    X=aligned_features,
+                    y=y,
+                    cv_splitter=cv_splitter,
+                    trainer=trainer,
+                    model_name=model_name,
+                    horizon=horizon,
+                )
+
+                # Store successful result
+                results[(model_name, horizon)] = {
+                    "oof": cv_result["oof_predictions"],
+                    "model": cv_result["final_model"],
+                    "cv_scores": cv_result["cv_scores"],
+                }
+
+                logger.info(
+                    f"Successfully trained {model_name} for {horizon} horizon "
+                    f"(oof_size={len(cv_result['oof_predictions'])}, "
+                    f"cv_folds={len(cv_result['cv_scores'])})"
+                )
+
+            except Exception as e:
+                error_msg = str(e)
+                failures.append((model_name, horizon, error_msg))
+                logger.error(
+                    f"Training failed for model={model_name}, horizon={horizon}: {error_msg}"
+                )
+                # Continue with other pairs (partial failure handling)
+
+    # Validate at least one pair succeeded
+    n_success = len(results)
+    n_failed = len(failures)
+
+    if n_success == 0:
+        # All pairs failed - raise RuntimeError with summary
+        failure_summary = "\n".join(
+            [f"  - {model}/{horizon}: {err}" for model, horizon, err in failures]
+        )
+        raise RuntimeError(
+            f"All {total_pairs} model-horizon pairs failed training:\n{failure_summary}"
+        )
+
+    # Log summary
+    logger.info(
+        f"Multi-horizon training complete: {n_success}/{total_pairs} pairs successful, "
+        f"{n_failed} failed"
+    )
+
+    if failures:
+        logger.warning(f"Failed pairs: {[(m, h) for m, h, _ in failures]}")
+
+    return results
 
 
 def save_multi_horizon_results(
@@ -885,26 +990,106 @@ def save_multi_horizon_results(
                 xgboost_21d_importance.parquet
                 xgboost_63d_importance.parquet
     """
-    # TODO P3C4-001-009: Validate results dict is not empty
-    # Raise ValueError if empty: "Cannot save empty results"
+    # Import persistence utilities here to avoid circular imports
+    from src.model2.persistence import save_oof_predictions, save_trained_model
 
-    # TODO P3C4-001-009: Create output subdirectories
-    # Subdirs: oof/, models/, cv_scores/, feature_importance/
+    # Validate results dict is not empty
+    if not results:
+        raise ValueError("Cannot save empty results dictionary")
 
-    # TODO P3C4-001-009: Iterate over all (model_name, horizon) pairs
-    # For each pair:
-    #   1. Save OOF predictions using persistence.save_oof_predictions()
-    #      Path: {output_dir}/oof/{model_name}_{horizon}_oof.parquet
-    #   2. Save final model using persistence.save_trained_model()
-    #      Path: {output_dir}/models/{model_name}_{horizon}.pkl
-    #   3. Save CV scores to JSON
-    #      Path: {output_dir}/cv_scores/{model_name}_{horizon}_cv_scores.json
-    #   4. If model has feature importance (XGBoost), save using save_feature_importance()
-    #      Path: {output_dir}/feature_importance/{model_name}_{horizon}_importance.parquet
-
-    # TODO P3C4-001-009: Log summary of saved files
-    # Format: "Saved outputs for {n} model-horizon pairs to {output_dir}"
-
-    raise NotImplementedError(
-        "P3C4-001-009: save_multi_horizon_results stub - implementation required"
+    logger.info(
+        f"Saving multi-horizon results for {len(results)} model-horizon pairs to {output_dir}"
     )
+
+    # Create output subdirectories
+    output_dir = Path(output_dir)
+    subdirs = {
+        "oof": output_dir / "oof",
+        "models": output_dir / "models",
+        "cv_scores": output_dir / "cv_scores",
+        "feature_importance": output_dir / "feature_importance",
+    }
+
+    for subdir_name, subdir_path in subdirs.items():
+        subdir_path.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Created directory: {subdir_path}")
+
+    # Track save successes and failures
+    save_failures: list[tuple[str, str, str, str]] = []  # (model, horizon, artifact, error)
+
+    # Iterate over all (model_name, horizon) pairs
+    for (model_name, horizon), pair_results in results.items():
+        logger.info(f"Saving outputs for {model_name}_{horizon}")
+
+        # 1. Save OOF predictions
+        try:
+            oof_path = subdirs["oof"] / f"{model_name}_{horizon}_oof.parquet"
+            save_oof_predictions(pair_results["oof"], oof_path)
+            logger.debug(f"Saved OOF predictions to {oof_path}")
+        except Exception as e:
+            error_msg = f"Failed to save OOF predictions: {e}"
+            save_failures.append((model_name, horizon, "oof", error_msg))
+            logger.error(f"{model_name}_{horizon}: {error_msg}")
+
+        # 2. Save final model
+        try:
+            model_path = subdirs["models"] / f"{model_name}_{horizon}.pkl"
+            save_trained_model(
+                pair_results["model"],
+                model_path,
+                extra_metadata={"region": region, "horizon": horizon},
+            )
+            logger.debug(f"Saved model to {model_path}")
+        except Exception as e:
+            error_msg = f"Failed to save model: {e}"
+            save_failures.append((model_name, horizon, "model", error_msg))
+            logger.error(f"{model_name}_{horizon}: {error_msg}")
+
+        # 3. Save CV scores to JSON
+        try:
+            cv_scores_path = subdirs["cv_scores"] / f"{model_name}_{horizon}_cv_scores.json"
+            with open(cv_scores_path, "w") as f:
+                json.dump(pair_results["cv_scores"], f, indent=2)
+            logger.debug(f"Saved CV scores to {cv_scores_path}")
+        except Exception as e:
+            error_msg = f"Failed to save CV scores: {e}"
+            save_failures.append((model_name, horizon, "cv_scores", error_msg))
+            logger.error(f"{model_name}_{horizon}: {error_msg}")
+
+        # 4. Save feature importance (XGBoost only)
+        if model_name == "xgboost":
+            try:
+                model = pair_results["model"]
+                importance_df = model.get_feature_importance()
+
+                if importance_df is not None and not importance_df.empty:
+                    importance_path = (
+                        subdirs["feature_importance"] / f"{model_name}_{horizon}_importance.parquet"
+                    )
+                    save_feature_importance(importance_df, importance_path)
+                    logger.debug(f"Saved feature importance to {importance_path}")
+                else:
+                    logger.warning(
+                        f"{model_name}_{horizon}: No feature importance to save (empty or None)"
+                    )
+            except Exception as e:
+                error_msg = f"Failed to save feature importance: {e}"
+                save_failures.append((model_name, horizon, "feature_importance", error_msg))
+                logger.error(f"{model_name}_{horizon}: {error_msg}")
+
+    # Log summary
+    total_artifacts = len(results) * 3 + sum(
+        1 for (model_name, _) in results.keys() if model_name == "xgboost"
+    )
+    n_failures = len(save_failures)
+    n_success = total_artifacts - n_failures
+
+    logger.info(
+        f"Saved outputs for {len(results)} model-horizon pairs to {output_dir}: "
+        f"{n_success}/{total_artifacts} artifacts saved successfully"
+    )
+
+    if save_failures:
+        logger.warning(
+            f"{n_failures} artifact save failures: {[(m, h, a) for m, h, a, _ in save_failures]}"
+        )

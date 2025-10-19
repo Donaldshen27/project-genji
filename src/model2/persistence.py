@@ -45,6 +45,7 @@ T = TypeVar("T", bound=BaseModelTrainer)
 
 # Dataclasses ---------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class ModelArtifactMetadata(Generic[T]):
     """Metadata stored alongside a serialized model artifact."""
@@ -118,6 +119,7 @@ class OOFArtifactMetadata:
 
 
 # Helpers -------------------------------------------------------------------
+
 
 def _ensure_parent_dir(path: Path) -> None:
     try:
@@ -268,6 +270,7 @@ def _prepare_oof_table(oof_df: pd.DataFrame) -> pa.Table:
 
 
 # Public API ----------------------------------------------------------------
+
 
 def save_trained_model(
     model: BaseModelTrainer,
