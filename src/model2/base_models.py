@@ -23,6 +23,16 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# Constants (P3C4-001-010)
+# ============================================================================
+
+# CV score schema keys (NON-NEGOTIABLE per P3C4-001-010)
+CV_SCORE_SCHEMA_KEYS = frozenset({"model", "horizon", "fold_id", "r2", "mse", "mae"})
+
+# Outlier threshold: ±500 bps = ±5.0 (NON-NEGOTIABLE per P3C4-001-006)
+OUTLIER_THRESHOLD_BPS = 5.0
+
 
 class BaseModelTrainer(ABC):
     """
@@ -478,6 +488,200 @@ def save_feature_importance(importance_df: pd.DataFrame, output_path: Path) -> N
 
 
 # ============================================================================
+# CV Score Computation and Logging (P3C4-001-010)
+# ============================================================================
+
+
+def compute_cv_scores(
+    y_true: pd.Series | np.ndarray,
+    y_pred: np.ndarray,
+    fold_idx: int,
+    model_name: str,
+    horizon: str,
+) -> dict[str, Any]:
+    """Compute CV metrics for a single fold.
+
+    Per P3C4-001-010: Primary function for computing fold-level CV scores.
+    Validates predictions, computes r2/mse/mae, handles edge cases.
+
+    Args:
+        y_true: Ground truth labels
+        y_pred: Model predictions
+        fold_idx: Fold index
+        model_name: Model identifier ("ridge", "xgboost")
+        horizon: Horizon identifier ("21d", "63d")
+
+    Returns:
+        Dictionary with CV score schema:
+        {'model': str, 'horizon': str, 'fold_id': int, 'r2': float, 'mse': float, 'mae': float}
+
+    Raises:
+        ValueError: If y_pred contains NaN or Inf values
+
+    Edge cases:
+        - y_true all constant: r2=NaN, log warning
+        - y_pred contains NaN: Raise ValueError before scoring
+        - Negative r2 (worse than mean): Log warning, keep value
+    """
+    # Normalize inputs to NumPy arrays for consistent validation
+    y_true_array = np.asarray(y_true)
+    y_pred_array = np.asarray(y_pred)
+
+    if y_true_array.ndim != 1:
+        raise ValueError(
+            f"Fold {fold_idx}: y_true must be one-dimensional, got shape {y_true_array.shape}"
+        )
+    if y_pred_array.ndim != 1:
+        raise ValueError(
+            f"Fold {fold_idx}: y_pred must be one-dimensional, got shape {y_pred_array.shape}"
+        )
+    if y_true_array.shape[0] != y_pred_array.shape[0]:
+        raise ValueError(
+            f"Fold {fold_idx}: y_true and y_pred length mismatch "
+            f"({y_true_array.shape[0]} vs {y_pred_array.shape[0]})"
+        )
+
+    # Validate predictions are finite
+    if not np.all(np.isfinite(y_pred_array)):
+        raise ValueError(f"Fold {fold_idx}: predictions contain NaN or Inf values")
+
+    # Compute metrics
+    r2 = r2_score(y_true_array, y_pred_array)
+    mse = mean_squared_error(y_true_array, y_pred_array)
+    mae = mean_absolute_error(y_true_array, y_pred_array)
+
+    # Handle edge case: constant target (r2 may be NaN)
+    if y_true_array.size > 0 and np.allclose(y_true_array, y_true_array[0]):
+        if np.issubdtype(y_true_array.dtype, np.number):
+            constant_value = f"{float(y_true_array[0]):.4f}"
+        else:
+            constant_value = repr(y_true_array[0])
+        logger.warning(
+            f"Fold {fold_idx}: constant target detected (y_true={constant_value}), r2={r2}"
+        )
+
+    # Handle edge case: negative r2 (worse than mean baseline)
+    if np.isfinite(r2) and r2 < 0:
+        logger.warning(
+            f"Fold {fold_idx}: negative r2={r2:.4f} (model worse than mean baseline)"
+        )
+
+    # Return CV score dict with schema-compliant keys
+    return {
+        "model": model_name,
+        "horizon": horizon,
+        "fold_id": fold_idx,
+        "r2": float(r2),
+        "mse": float(mse),
+        "mae": float(mae),
+    }
+
+
+def validate_cv_score_schema(cv_score: dict[str, Any]) -> None:
+    """Validate CV score dict matches expected schema.
+
+    Per P3C4-001-010: Ensure CV score dict has required keys.
+
+    Args:
+        cv_score: CV score dict from compute_cv_scores()
+
+    Raises:
+        ValueError: If required keys are missing or types are invalid
+    """
+    missing_keys = CV_SCORE_SCHEMA_KEYS - set(cv_score.keys())
+    if missing_keys:
+        raise ValueError(
+            f"CV score dict missing required keys: {sorted(missing_keys)}. "
+            f"Expected keys: {sorted(CV_SCORE_SCHEMA_KEYS)}"
+        )
+
+    # Type validation
+    if not isinstance(cv_score["model"], str):
+        raise ValueError(f"CV score 'model' must be str, got {type(cv_score['model'])}")
+    if not isinstance(cv_score["horizon"], str):
+        raise ValueError(f"CV score 'horizon' must be str, got {type(cv_score['horizon'])}")
+    if not isinstance(cv_score["fold_id"], int):
+        raise ValueError(f"CV score 'fold_id' must be int, got {type(cv_score['fold_id'])}")
+    if not isinstance(cv_score["r2"], (int, float)):
+        raise ValueError(f"CV score 'r2' must be numeric, got {type(cv_score['r2'])}")
+    if not isinstance(cv_score["mse"], (int, float)):
+        raise ValueError(f"CV score 'mse' must be numeric, got {type(cv_score['mse'])}")
+    if not isinstance(cv_score["mae"], (int, float)):
+        raise ValueError(f"CV score 'mae' must be numeric, got {type(cv_score['mae'])}")
+
+
+def aggregate_cv_scores(cv_scores: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate CV scores across folds.
+
+    Per P3C4-001-010: Compute mean and std for r2, mse, mae across all folds.
+    Uses np.nanmean/np.nanstd to handle NaN values (e.g., constant targets).
+
+    Args:
+        cv_scores: List of CV score dicts from compute_cv_scores()
+
+    Returns:
+        Aggregate statistics dict:
+        {'n_folds': int, 'r2_mean': float, 'r2_std': float,
+         'mse_mean': float, 'mse_std': float, 'mae_mean': float, 'mae_std': float}
+
+    Raises:
+        ValueError: If cv_scores is empty
+    """
+    if not cv_scores:
+        raise ValueError("Cannot aggregate empty cv_scores list")
+
+    # Extract metric arrays
+    r2_scores = np.array([score["r2"] for score in cv_scores])
+    mse_scores = np.array([score["mse"] for score in cv_scores])
+    mae_scores = np.array([score["mae"] for score in cv_scores])
+
+    # Compute statistics using np.nanmean/np.nanstd for robust handling
+    return {
+        "n_folds": len(cv_scores),
+        "r2_mean": float(np.nanmean(r2_scores)),
+        "r2_std": float(np.nanstd(r2_scores)),
+        "mse_mean": float(np.nanmean(mse_scores)),
+        "mse_std": float(np.nanstd(mse_scores)),
+        "mae_mean": float(np.nanmean(mae_scores)),
+        "mae_std": float(np.nanstd(mae_scores)),
+    }
+
+
+def log_cv_scores_json(cv_scores: list[dict[str, Any]], output_path: Path) -> None:
+    """Write CV scores to JSON file with NaN support.
+
+    Per P3C4-001-010: Persist CV scores to JSON with allow_nan=True for
+    edge cases like constant targets (r2=NaN).
+
+    Args:
+        cv_scores: List of CV score dicts from compute_cv_scores()
+        output_path: Path to output JSON file
+
+    Raises:
+        ValueError: If cv_scores is empty or schema validation fails
+        OSError: If file write fails
+    """
+    if not cv_scores:
+        raise ValueError("Cannot write empty cv_scores list to JSON")
+
+    # Validate all scores match schema
+    for score in cv_scores:
+        validate_cv_score_schema(score)
+
+    # Create parent directory if needed
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Write to JSON with allow_nan=True for NaN handling
+    try:
+        with open(output_path, "w") as f:
+            json.dump(cv_scores, f, indent=2, allow_nan=True)
+        logger.info(f"Saved {len(cv_scores)} CV scores to {output_path}")
+    except Exception as e:
+        raise OSError(f"Failed to write CV scores to {output_path}: {e}") from e
+
+
+# ============================================================================
 # CV Training Loop Orchestrator (P3C4-001-006)
 # ============================================================================
 
@@ -490,11 +694,12 @@ def run_cv_training(
     model_name: str,
     horizon: str,
 ) -> dict[str, Any]:
-    """
-    Orchestrate cross-validation training loop for a single model-horizon pair.
+    """Orchestrate cross-validation training loop for a single model-horizon pair.
 
     Per P3C4-001-006: train on each CV fold, collect OOF predictions,
     compute CV scores, train final model on all data.
+
+    Per P3C4-001-010: Use compute_cv_scores() and log aggregate statistics.
 
     Args:
         X: Feature matrix with MultiIndex (instrument, datetime)
@@ -516,7 +721,7 @@ def run_cv_training(
     Edge cases:
         - Small fold: Validate min 100 samples per fold
         - Training failure: Log error with fold context, re-raise
-        - Outlier predictions: Log warning if all predictions exceed ±1000 bps
+        - Outlier predictions: Log warning if >1% of predictions exceed ±OUTLIER_THRESHOLD_BPS
     """
     logger.info(
         f"Starting CV training: model={model_name}, horizon={horizon}, "
@@ -529,8 +734,16 @@ def run_cv_training(
     # Initialize CV scores list
     cv_scores: list[dict[str, Any]] = []
 
+    try:
+        fold_splits = list(cv_splitter.split(X))
+    except ValueError as err:
+        raise ValueError(
+            "CV splitter failed to generate folds that meet the minimum 100 required test "
+            f"samples per fold: {err}"
+        ) from err
+
     # Iterate through CV folds
-    for fold_idx, (train_idx, test_idx) in enumerate(cv_splitter.split(X)):
+    for fold_idx, (train_idx, test_idx) in enumerate(fold_splits):
         logger.info(f"Fold {fold_idx}: train_size={len(train_idx)}, test_size={len(test_idx)}")
 
         # Validate fold size >= 100 samples
@@ -560,8 +773,8 @@ def run_cv_training(
         # This ensures downstream joins work correctly with (instrument, datetime) labels
         fold_predictions_list.append((X_test.index, predictions, fold_idx))
 
-        # Compute and log fold metrics
-        fold_metrics = _compute_fold_metrics(y_test, predictions, fold_idx, model_name, horizon)
+        # Compute and log fold metrics using compute_cv_scores() (P3C4-001-010)
+        fold_metrics = compute_cv_scores(y_test, predictions, fold_idx, model_name, horizon)
         cv_scores.append(fold_metrics)
         logger.info(
             f"Fold {fold_idx} metrics: r2={fold_metrics['r2']:.4f}, "
@@ -584,11 +797,14 @@ def run_cv_training(
         logger.error(f"Final model training failed: {e}")
         raise ValueError("Final model training failed") from e
 
-    # Log aggregate CV scores
+    # Log aggregate CV scores (P3C4-001-010)
     if cv_scores:
-        r2_scores = [score["r2"] for score in cv_scores]
+        agg_scores = aggregate_cv_scores(cv_scores)
         logger.info(
-            f"CV aggregate: r2_mean={np.mean(r2_scores):.4f}, r2_std={np.std(r2_scores):.4f}"
+            f"CV aggregate ({agg_scores['n_folds']} folds): "
+            f"r2_mean={agg_scores['r2_mean']:.4f}, r2_std={agg_scores['r2_std']:.4f}, "
+            f"mse_mean={agg_scores['mse_mean']:.4f}, mse_std={agg_scores['mse_std']:.4f}, "
+            f"mae_mean={agg_scores['mae_mean']:.4f}, mae_std={agg_scores['mae_std']:.4f}"
         )
 
     # Return results
@@ -600,8 +816,7 @@ def run_cv_training(
 
 
 def _clone_trainer(trainer: BaseModelTrainer) -> BaseModelTrainer:
-    """
-    Clone a trainer instance to create a fresh model for a new fold.
+    """Clone a trainer instance to create a fresh model for a new fold.
 
     Per P3C4-001-006: Each fold should use a fresh model instance.
     Uses trainer.__class__() to preserve actual class (including subclasses).
@@ -626,8 +841,10 @@ def _compute_fold_metrics(
     model_name: str,
     horizon: str,
 ) -> dict[str, Any]:
-    """
-    Compute CV metrics for a single fold.
+    """Compute CV metrics for a single fold.
+
+    DEPRECATED: Use compute_cv_scores() instead (P3C4-001-010).
+    Kept for backward compatibility.
 
     Per P3C4-001-006: Compute r2, mse, mae for each fold.
 
@@ -644,35 +861,15 @@ def _compute_fold_metrics(
     Raises:
         ValueError: If y_pred contains NaN values
     """
-    # Validate predictions are finite
-    if not np.all(np.isfinite(y_pred)):
-        raise ValueError(f"Fold {fold_idx}: predictions contain NaN or Inf values")
-
-    # Compute metrics
-    r2 = r2_score(y_true, y_pred)
-    mse = mean_squared_error(y_true, y_pred)
-    mae = mean_absolute_error(y_true, y_pred)
-
-    # Handle edge case: constant target (r2 may be NaN)
-    if np.allclose(y_true, y_true.iloc[0]):
-        logger.warning(f"Fold {fold_idx}: constant target detected, r2 may be NaN")
-
-    # Return metrics dict
-    return {
-        "model": model_name,
-        "horizon": horizon,
-        "fold_id": fold_idx,
-        "r2": float(r2),
-        "mse": float(mse),
-        "mae": float(mae),
-    }
+    # Delegate to compute_cv_scores() (P3C4-001-010)
+    return compute_cv_scores(y_true, y_pred, fold_idx, model_name, horizon)
 
 
 def _check_outlier_predictions(predictions: np.ndarray, fold_idx: int) -> None:
-    """
-    Check for outlier predictions and log warnings.
+    """Check for outlier predictions and log warnings.
 
-    Per P3C4-001-006: Log warning if all predictions exceed ±1000 bps (±10.0).
+    Per P3C4-001-006: Log warning if >1% of predictions exceed ±OUTLIER_THRESHOLD_BPS.
+    Per P3C4-001-010: Use OUTLIER_THRESHOLD_BPS constant instead of hardcoded 5.0.
 
     Args:
         predictions: Model predictions for a fold
@@ -681,12 +878,19 @@ def _check_outlier_predictions(predictions: np.ndarray, fold_idx: int) -> None:
     if len(predictions) == 0:
         return
 
-    outlier_threshold = 10.0
-    if np.all(np.abs(predictions) > outlier_threshold):
-        logger.warning(
-            f"Fold {fold_idx}: all predictions exceed ±{outlier_threshold} "
-            f"(max={predictions.max():.2f}, min={predictions.min():.2f})"
-        )
+    exceed_count = np.count_nonzero(np.abs(predictions) > OUTLIER_THRESHOLD_BPS)
+    exceed_fraction = exceed_count / len(predictions)
+    if exceed_fraction > 0.01:
+        if math.isclose(exceed_fraction, 1.0, rel_tol=0.0, abs_tol=1e-9):
+            logger.warning(
+                f"Fold {fold_idx}: all predictions exceed ±{OUTLIER_THRESHOLD_BPS:.1f} "
+                f"(count={exceed_count}, max={predictions.max():.2f}, min={predictions.min():.2f})"
+            )
+        else:
+            logger.warning(
+                f"Fold {fold_idx}: {exceed_fraction:.2%} of predictions exceed ±{OUTLIER_THRESHOLD_BPS:.1f} "
+                f"(count={exceed_count}, max={predictions.max():.2f}, min={predictions.min():.2f})"
+            )
 
 
 def aggregate_oof_predictions(
@@ -955,6 +1159,8 @@ def save_multi_horizon_results(
     Per P3C4-001-009: Persist OOF predictions, models, CV scores, and feature
     importance for all model-horizon pairs.
 
+    Per P3C4-001-010: Use log_cv_scores_json() for JSON output with NaN support.
+
     Args:
         results: Output from train_multi_horizon()
         output_dir: Base directory for outputs (e.g., data/model2/us/)
@@ -1045,11 +1251,10 @@ def save_multi_horizon_results(
             save_failures.append((model_name, horizon, "model", error_msg))
             logger.error(f"{model_name}_{horizon}: {error_msg}")
 
-        # 3. Save CV scores to JSON
+        # 3. Save CV scores to JSON (P3C4-001-010: use log_cv_scores_json)
         try:
             cv_scores_path = subdirs["cv_scores"] / f"{model_name}_{horizon}_cv_scores.json"
-            with open(cv_scores_path, "w") as f:
-                json.dump(pair_results["cv_scores"], f, indent=2)
+            log_cv_scores_json(pair_results["cv_scores"], cv_scores_path)
             logger.debug(f"Saved CV scores to {cv_scores_path}")
         except Exception as e:
             error_msg = f"Failed to save CV scores: {e}"
