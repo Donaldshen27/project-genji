@@ -32,36 +32,6 @@
     "acceptance": "All 4 model-horizon pairs train successfully, all outputs saved"
   },
   {
-    "ticket_id": "P3C4-001-010",
-    "title": "CV Score Logging and Aggregation",
-    "description": "Log per-fold CV scores and compute aggregate statistics",
-    "module": "src/model2/base_models.py",
-    "dependencies": [
-      "P3C4-001-006"
-    ],
-    "input": {
-      "description": "Per-fold predictions and ground truth",
-      "schema": "y_true: np.ndarray, y_pred: np.ndarray, fold_id: int, model_name: str, horizon: str"
-    },
-    "output": {
-      "description": "CV score dict",
-      "schema": "{'model': str, 'horizon': str, 'fold_id': int, 'r2': float, 'mse': float, 'mae': float}"
-    },
-    "edge_cases": [
-      "y_true all constant: r2 = NaN, log warning",
-      "y_pred contains NaN: Raise ValueError before scoring",
-      "Metric computation fails: Log error, return None for that metric",
-      "Negative r2 (worse than mean): Log warning, keep value"
-    ],
-    "tests": [
-      "test_cv_score_computation: Verify r2, mse, mae computed correctly on toy data",
-      "test_cv_score_constant_target: Verify r2=NaN logged with warning",
-      "test_cv_score_logging_format: Verify logged dict matches CVScores.schema.json",
-      "test_cv_score_aggregation: Verify mean and std computed across folds"
-    ],
-    "acceptance": "CV scores computed for all folds, logged in JSON format, aggregated mean/std reported"
-  },
-  {
     "ticket_id": "P3C4-001-011",
     "title": "Determinism Validation Test",
     "description": "Test that training with seed=42 produces identical results on repeat",

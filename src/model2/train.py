@@ -946,3 +946,15 @@ def aggregate_oof_predictions(
     aggregated = pd.concat(frames).sort_index()
     aggregated = aggregated[["prediction", "fold_id"]]
     return aggregated
+
+
+# ============================================================================
+# Compatibility Shims
+# ============================================================================
+# Ensure legacy imports from src.model2.train resolve to the implementations in
+# src.model2.base_models so persistence and registry share the same classes.
+from src.model2 import base_models as _base_models
+
+BaseModelTrainer = _base_models.BaseModelTrainer
+RidgeTrainer = _base_models.RidgeTrainer
+XGBoostTrainer = _base_models.XGBoostTrainer

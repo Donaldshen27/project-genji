@@ -17,7 +17,7 @@ import logging
 import math
 from typing import Any, Literal
 
-from src.model2.train import RidgeTrainer, XGBoostTrainer
+from src.model2.base_models import RidgeTrainer, XGBoostTrainer
 
 logger = logging.getLogger(__name__)
 

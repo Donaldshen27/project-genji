@@ -229,14 +229,19 @@ def main() -> None:
         )
         review_output = result.stdout + result.stderr
     except subprocess.TimeoutExpired:
-        emit("deny", "Codex review timed out after 1490 seconds. Please try again.")
+        review_output = "Codex review timed out after 1490 seconds. Please try again."
+        persist_review_output(tool_name, tool_input, review_output)
+        emit("deny", review_output)
     except FileNotFoundError:
-        emit(
-            "deny",
-            "Codex command not found. Please ensure codex is installed and in PATH.",
+        review_output = (
+            "Codex command not found. Please ensure codex is installed and in PATH."
         )
+        persist_review_output(tool_name, tool_input, review_output)
+        emit("deny", review_output)
     except Exception as exc:
-        emit("deny", f"Error running codex: {exc}")
+        review_output = f"Error running codex: {exc}"
+        persist_review_output(tool_name, tool_input, review_output)
+        emit("deny", review_output)
 
     persist_review_output(tool_name, tool_input, review_output)
 
